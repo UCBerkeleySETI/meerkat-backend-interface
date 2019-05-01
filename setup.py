@@ -11,7 +11,7 @@ requires = [
     'docker-pycreds==0.3.0',
     'docopt==0.6.2',
     'enum34==1.1.6',
-    'future==0.16.0',
+    'future==0.17.1',
     'futures==3.2.0',
     'idna==2.7',
     'ipaddress==1.0.22',
