@@ -52,7 +52,7 @@ class BLKATPortalClient(object):
         self.p = self.redis_server.pubsub(ignore_subscribe_messages=True)
         self.io_loop = io_loop = tornado.ioloop.IOLoop.current()
         self.subarray_katportals = dict()  # indexed by product id's
-        self.ant_sensors = ['marked_faulty', 'data_suspect']  # sensors required from each antenna
+        self.ant_sensors = ['data_suspect', 'pos_request_base_dec', 'pos_request_base_ra', 'ap_on_target']  # sensors required from each antenna
         self.async_sensor_list = []  # will be populated with sensors for subscription
 
     def MSG_TO_FUNCTION(self, msg_type):
@@ -193,7 +193,7 @@ class BLKATPortalClient(object):
             None, but does many things!
         """
         # TODO: get more information?
-        sensors_to_query = ['target', 'pos_request_base_ra', 'pos_request_base_dec', 'weight']
+        sensors_to_query = ['target', 'pos_request_base_ra', 'pos_request_base_dec', 'weight', 'ap_on_target']
         sensors_and_values = self.io_loop.run_sync(
             lambda: self._get_sensor_values(product_id, sensors_to_query))
         for sensor_name, value in sensors_and_values.items():
