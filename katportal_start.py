@@ -2,6 +2,7 @@
 
 import signal
 import sys
+import logging
 
 from meerkat_backend_interface.katportal_server import BLKATPortalClient
 from meerkat_backend_interface.logger import log, set_logger
