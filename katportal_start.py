@@ -15,7 +15,7 @@ def on_shutdown():
 
 
 def main():
-    log = set_logger()
+    log = set_logger(log_level = logging.DEBUG)
     log.info("Starting Katportal Client")
 
     client = BLKATPortalClient()
