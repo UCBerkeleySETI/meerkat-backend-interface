@@ -63,7 +63,7 @@ def parse_spead_addresses(spead_addrs):
     except ValueError:
         n_addrs = 1
         addr_list = [addrs]
-    return addr_list, int(port)
+    return addr_list, port
 
 def cli():
     usage = "usage: %prog [options]"
@@ -101,7 +101,7 @@ def main(port):
                 if nstreams > NCHANNELS:
                     log.warning("More than {} ({}) stream addresses found".format(NCHANNELS, nstreams))
                 for i in range(min(nstreams, NCHANNELS)):
-                    msg = "{}:configure:stream:{}".format(product_id, addr_list[i])
+                    msg = "configure:{}:stream:{}:{}".format(product_id, addr_list[i], port)
                     red.publish(CHANNELS[i], msg)
     except KeyboardInterrupt:
         log.info("Stopping distributor")
