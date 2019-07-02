@@ -6,6 +6,7 @@ import json
 import logging
 import sys
 import redis
+import numpy as np
 from meerkat_backend_interface import redis_tools
 from meerkat_backend_interface.logger import log
 
@@ -28,31 +29,37 @@ def json_str_formatter(str_dict):
     str_dict = str_dict.replace('u', '')  # Remove unicode 'u'
     return str_dict
 
-def create_ip_list(addr0, n_addrs):
-    """Creates list of IP multicast subscription addresses.
+def create_addr_list(addr0, n_groups, n_addrs):
+    """Creates list of IP multicast subscription address groups.
 
     Args:
         addr0 (str): first IP address in the list.
-        n_addrs (int): number of consecutive IP addresses for subscription.
+        n_groups (int): number of available hashpipe instances.
+        n_per_group (int): number of SPEAD stream addresses per instance.
 
     Returns:
-        addr_list (list): list of IP addresses for subscription.
+        addr_list (list): list of IP address groups for subscription.
     """
     prefix, suffix0 = addr0.rsplit('.', 1)
-    addr_list = [addr0]
-    for i in range(1, n_addrs):
-        addr_list.append(prefix + '.{}'.format(i + int(suffix0)))
+    addr_list = []
+    extra_addrs = n_addrs%n_groups
+    n_per_group = np.ones(n_groups, dtype=int)*(n_addrs/n_groups)
+    n_per_group[:extra_addrs] += 1
+    for i in range(0, min(n_addrs, n_groups)):
+        addr_list.append(prefix + '.{}'.format(int(suffix0)) + '+' + str(n_per_group[i]-1))
+        suffix0 = int(suffix0) + n_per_group[i]
     return addr_list
 
-def parse_spead_addresses(spead_addrs):
-    """Parses spead addresses given in the format: spead://<ip>[+<count>]:<port>
+def read_spead_addresses(spead_addrs, n_groups):
+    """Parses spead addresses given in the format: spead://<ip>+<count>:<port>
     Assumes this format.
 
     Args:
         spead_addrs (str): string containing spead IP addresses in the format above.
+        n_groups (int): number of stream addresses to be sent to each processing instance.
 
     Returns:
-        addr_list (list): list of spead stream IP addresses for subscription.
+        addr_list (list): list of spead stream IP address groups.
         port (int): port number.
     """
     addrs = spead_addrs.split('/')[-1]
@@ -60,10 +67,9 @@ def parse_spead_addresses(spead_addrs):
     try:
         addr0, n_addrs = addrs.split('+')
         n_addrs = int(n_addrs) + 1
-        addr_list = create_ip_list(addr0, n_addrs)
+        addr_list = create_addr_list(addr0, n_groups, n_addrs)
     except ValueError:
-        n_addrs = 1
-        addr_list = [addrs]
+        addr_list = [addrs + '+0']
     return addr_list, port
 
 def cli():
@@ -84,13 +90,13 @@ def configure(cfg_file):
         with open(cfg_file, 'r') as f:
             try:
                 cfg = yaml.safe_load(f)
-                return(cfg['avail_processing_instances'], cfg['sensors_once_off'], 
+                return(cfg['hashpipe_instances'], cfg['sensors_once_off'], 
                 cfg['sensors_subscribe'])
             except yaml.YAMLError as E:
                 log.error(E)
     except IOError:
         log.error('Config file not found')
-        
+
 def main(port, cfg_file):
     FORMAT = "[ %(levelname)s - %(asctime)s - %(filename)s:%(lineno)s] %(message)s"
     logging.basicConfig(format=FORMAT)
@@ -109,12 +115,12 @@ def main(port, cfg_file):
             product_id = msg_parts[1]
             if msg_type == 'configure':
                 try:
-                    configure(cfg_file)           
+                    hashpipe_instances, sensors_once_off, sensors_subscribe = configure(cfg_file)           
                 except:
-                    log.warning('Configuration not updated')
+                    log.warning('Configuration not updated; old configuration might be present.')
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
-                addr_list, port = parse_spead_addresses(streams.values()[0])
+                addr_list, port = read_spead_addresses(streams.values()[0])
                 nstreams = len(addr_list)
                 if nstreams > NCHANNELS:
                     log.warning("More than {} ({}) stream addresses found".format(NCHANNELS, nstreams))
