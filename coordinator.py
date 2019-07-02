@@ -12,8 +12,7 @@ from meerkat_backend_interface.logger import log
 
 CHANNEL     = redis_tools.REDIS_CHANNELS.alerts  # Redis channel to listen on
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'  # Type of stream to distribute
-NCHANNELS   = 64                                 # Number of channels to distribute into
-CHANNELS = ["chan{:03d}".format(n) for n in range(NCHANNELS)]
+HPGDOMAIN   = 'bluse'
 
 def json_str_formatter(str_dict):
     """Formatting for json.loads
@@ -101,7 +100,7 @@ def main(port, cfg_file):
     FORMAT = "[ %(levelname)s - %(asctime)s - %(filename)s:%(lineno)s] %(message)s"
     logging.basicConfig(format=FORMAT)
     log.setLevel(logging.DEBUG)
-    log.info("Starting distributor")
+    log.info("Starting coordinator")
     red = redis.StrictRedis(port=port)
     ps = red.pubsub(ignore_subscribe_messages=True)
     ps.subscribe(CHANNEL)
@@ -120,15 +119,14 @@ def main(port, cfg_file):
                     log.warning('Configuration not updated; old configuration might be present.')
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
-                addr_list, port = read_spead_addresses(streams.values()[0])
-                nstreams = len(addr_list)
-                if nstreams > NCHANNELS:
-                    log.warning("More than {} ({}) stream addresses found".format(NCHANNELS, nstreams))
-                for i in range(min(nstreams, NCHANNELS)):
-                    msg = "configure:{}:stream:{}:{}".format(product_id, addr_list[i], port)
-                    red.publish(CHANNELS[i], msg)
+                addr_list, port = read_spead_addresses(streams.values()[0], len(hashpipe_instances))
+                nchannels = len(addr_list)
+                for i in range(nchannels):
+                    msg = 'DESTIP={}'.format(addr_list[i])
+                    channel = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
+                    red.publish(channel, msg)
     except KeyboardInterrupt:
-        log.info("Stopping distributor")
+        log.info("Stopping coordinator")
         sys.exit(0)
     except Exception as e:
         log.error(e)
