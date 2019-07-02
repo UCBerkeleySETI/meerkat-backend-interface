@@ -1,0 +1,25 @@
+# .yaml configuration file for the coordinator.
+
+avail_processing_instances
+- blpn48/0
+- blpn49/0
+- blpn50/0
+- blpn51/0
+- blpn52/0
+- blpn53/0
+- blpn54/0
+- blpn55/0
+- blpn56/0
+- blpn57/0
+- blpn58/0
+- blpn59/0
+
+sensors_once_off
+- band
+
+sensors_subscription
+- data_suspect
+
+ 
+ 
+

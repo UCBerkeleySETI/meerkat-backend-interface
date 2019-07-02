@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from optparse import OptionParser
+import yaml
 import json
 import logging
 import sys
@@ -70,15 +71,27 @@ def cli():
     parser = OptionParser(usage=usage)
     parser.add_option('-p', '--port', dest='port', type=long,
                       help='Redis port to connect to', default=6379)
+    parser.add_option('-c', '--config_file', dest='cfg_file', type=str,
+                      help='Config filename (yaml)', default='cfg_coordinator.yaml')
     (opts, args) = parser.parse_args()
     # if not opts.port:
     #     print "MissingArgument: Port number"
     #     sys.exit(-1)
-    main(port=opts.port)
+    main(port=opts.port, cfg_file=opts.cfg_file)
 
-def main(port):
+def configure(cfg_file):
+    try:
+        with open(cfg_file, 'r') as f:
+            try:
+                cfg = yaml.safe_load(f)
+            except yaml.YAMLError as E:
+                print(E)
+    except IOError:
+        print('Config file not found')
+    return cfg    
+
+def main(port, cfg_file):
     FORMAT = "[ %(levelname)s - %(asctime)s - %(filename)s:%(lineno)s] %(message)s"
-    # logger = logging.getLogger('reynard')
     logging.basicConfig(format=FORMAT)
     log.setLevel(logging.DEBUG)
     log.info("Starting distributor")
