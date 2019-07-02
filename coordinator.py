@@ -125,6 +125,7 @@ def main(port, cfg_file):
                     msg = 'DESTIP={}'.format(addr_list[i])
                     channel = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
                     red.publish(channel, msg)
+                red.publish(HPGDOMAIN + ':///set', 'BINDPORT=' + port)
             if msg_type == 'deconfigure':
                 for i in range(nchannels):
                     msg = 'DESTIP=0.0.0.0'
