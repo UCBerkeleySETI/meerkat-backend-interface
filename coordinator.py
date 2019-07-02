@@ -84,12 +84,13 @@ def configure(cfg_file):
         with open(cfg_file, 'r') as f:
             try:
                 cfg = yaml.safe_load(f)
+                return(cfg['avail_processing_instances'], cfg['sensors_once_off'], 
+                cfg['sensors_subscribe'])
             except yaml.YAMLError as E:
-                print(E)
+                log.error(E)
     except IOError:
-        print('Config file not found')
-    return cfg    
-
+        log.error('Config file not found')
+        
 def main(port, cfg_file):
     FORMAT = "[ %(levelname)s - %(asctime)s - %(filename)s:%(lineno)s] %(message)s"
     logging.basicConfig(format=FORMAT)
@@ -107,6 +108,10 @@ def main(port, cfg_file):
             msg_type = msg_parts[0]
             product_id = msg_parts[1]
             if msg_type == 'configure':
+                try:
+                    configure(cfg_file)           
+                except:
+                    log.warning('Configuration not updated')
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
                 addr_list, port = parse_spead_addresses(streams.values()[0])
