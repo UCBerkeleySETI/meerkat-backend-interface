@@ -125,6 +125,11 @@ def main(port, cfg_file):
                     msg = 'DESTIP={}'.format(addr_list[i])
                     channel = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
                     red.publish(channel, msg)
+            if msg_type == 'deconfigure':
+                for i in range(nchannels):
+                    msg = 'DESTIP=0.0.0.0'
+                    channel = HPGDOMAIN + ':///set'
+                    red.publish(channel, msg)
     except KeyboardInterrupt:
         log.info("Stopping coordinator")
         sys.exit(0)
