@@ -26,6 +26,7 @@ requires = [
     'psutil==5.4.6',
     'pyparsing==2.2.0',
     'pyperclip==1.6.2',
+    'pyyaml==5.1.1',
     'redis==2.10.6',
     'requests>=2.20.0',
     'singledispatch==3.4.0.3',
@@ -54,7 +55,7 @@ setuptools.setup(
     long_description=open("README.md").read(),
 
     py_modules=[
-        'distributor',
+        'coordinator',
         'katcp_start',
         'katportal_start',
         ],
@@ -72,7 +73,7 @@ setuptools.setup(
 
     entry_points={
         'console_scripts': [
-            'distributor = distributor:cli',
+            'coordinator = coordinator:cli',
             'katcp_start = katcp_start:cli',
             'katportal_start = katportal_start:main',
             ]

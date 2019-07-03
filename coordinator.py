@@ -132,7 +132,7 @@ def main(port, cfg_file):
             if msg_type == 'capture-start':
                 channel = HPGDOMAIN + ':///set'
                 red.publish(channel, 'NETSTAT=RECORD')
-            if msg_type == 'capture-done':
+            if msg_type == 'capture-stop':
                 channel = HPGDOMAIN + ':///set'
                 red.publish(channel, 'NETSTAT=LISTEN')
     except KeyboardInterrupt:
