@@ -127,10 +127,14 @@ def main(port, cfg_file):
                     red.publish(channel, msg)
                 red.publish(HPGDOMAIN + ':///set', 'BINDPORT=' + port)
             if msg_type == 'deconfigure':
-                for i in range(nchannels):
-                    msg = 'DESTIP=0.0.0.0'
-                    channel = HPGDOMAIN + ':///set'
-                    red.publish(channel, msg)
+                channel = HPGDOMAIN + ':///set'
+                red.publish(channel, 'DESTIP=0.0.0.0')
+            if msg_type == 'capture-start':
+                channel = HPGDOMAIN + ':///set'
+                red.publish(channel, 'NETSTAT=RECORD')
+            if msg_type == 'capture-done':
+                channel = HPGDOMAIN + ':///set'
+                red.publish(channel, 'NETSTAT=LISTEN')
     except KeyboardInterrupt:
         log.info("Stopping coordinator")
         sys.exit(0)
