@@ -170,7 +170,7 @@ class BLKATPortalClient(object):
         """
         schedule_blocks = self.io_loop.run_sync(lambda: self._get_future_targets(product_id))
         key = "{}:schedule_blocks".format(product_id)
-        write_list_redis(self.redis_server, key, repr(schedule_blocks))  # overrides previous list
+        write_pair_redis(self.redis_server, key, json.dumps(schedule_blocks))
         # Start io_loop to listen to sensors whose values should be registered
         # immediately when they change.
         self.io_loop.add_callback(lambda: self.subscribe_sensors(product_id))
