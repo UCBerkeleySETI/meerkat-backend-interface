@@ -8,6 +8,7 @@ import redis
 from functools import partial
 import json
 import yaml
+import os
 
 from .redis_tools import (
     REDIS_CHANNELS,
@@ -55,9 +56,10 @@ class BLKATPortalClient(object):
         self.io_loop = io_loop = tornado.ioloop.IOLoop.current()
         self.subarray_katportals = dict()  # indexed by product id's
         self.config_file = config_file
-        self.ant_sensors = ['data_suspect', 'pos_request_base_dec', 'pos_request_base_ra']  # sensors required from each antenna
-        self.cont_update_sensors = [] 
-        self.conf_sensors = []
+        self.ant_sensors = []  # sensors required from each antenna
+        self.cont_update_sensors = []  # other sensors for continuous update
+        self.conf_sensors = []  # sensors to be queried once-off on configure
+        self.config_file = config_file #check if needed
 
     def MSG_TO_FUNCTION(self, msg_type):
         MSG_TO_FUNCTION_DICT = {
@@ -72,7 +74,7 @@ class BLKATPortalClient(object):
 
     def start(self):
         try:
-            self.ant_sensors, self.conf_sensors, self.cont_update_sensors = self.configure(os.path.join(os.path.dirname(os.getcwd()), config_file))
+            self.ant_sensors, self.conf_sensors, self.cont_update_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
         except:
             logger.warning('Configuration not updated; old configuration might be present.')
         self.p.subscribe(REDIS_CHANNELS.alerts)
@@ -85,6 +87,9 @@ class BLKATPortalClient(object):
             msg_type = msg_parts[0]
             product_id = msg_parts[1]
             self.MSG_TO_FUNCTION(msg_type)(product_id)
+            # write last message to redis
+            key = '{}:last_message'.format(product_id)
+            write_pair_redis(self.redis_server, key, repr(msg_type))          
 
     def on_update_callback_fn(self, product_id, msg):
         """Handler for messages published over sensor websockets.
@@ -101,13 +106,27 @@ class BLKATPortalClient(object):
             if key == 'msg_data':
                 sensor_name = msg['msg_data']['name']
                 sensor_value = msg['msg_data']['value']
-                if sensor_name in self.async_sensor_list:
+                # sensors for continuous update
+                if sensor_name in self.cont_update_sensors:
                     key = "{}:{}".format(product_id, sensor_name)
                     write_pair_redis(self.redis_server, key, repr(sensor_value)) # ultimately this line may not be needed
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}'.format(sensor_name, sensor_value))
-                    print('Sensor value stored: {} = {}'.format(sensor_name, sensor_value))
-                else:
-                    print('Unlisted sensor; value discarded')
+                # subarray data-suspect
+                self.subarray_data_suspect(product_id, sensor_name)
+
+    def subarray_data_suspect(self, product_id, sensor_name):
+        if self.redis_server.get('{}:last_message'.format(product_id)) in ['capture-init', 'capture-start', 'capture-stop']:
+            if('data_suspect' in sensor_name):
+                ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
+                ant_status = []
+                for i in range(len(ant_list)):
+                    ant_status.append(self.redis_server.get('{}:{}_data_suspect'.format(product_id, ant_list[i])))
+                if(sum(ant_status) == 0): # all antennas show good data
+                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:'.format(product_id, False)) 
+
+
+
+        
 
     def gen_ant_sensor_list(self, product_id, ant_sensors):
         """Automatically builds a list of sensor names for each antenna.
@@ -123,12 +142,14 @@ class BLKATPortalClient(object):
         # Add sensors specific to antenna components for each antenna:
         ant_key = '{}:antennas'.format(product_id)
         ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))  # list of antennas
+        print(ant_list)
         for ant in ant_list:
             for sensor in ant_sensors:
                 ant_sensor_list.append(ant + '_' + sensor)
+        print(ant_sensor_list)
         return ant_sensor_list
 
-    def configure(cfg_file):
+    def configure_katportal(self, cfg_file):
         try:
             with open(cfg_file, 'r') as f:
                 try:
@@ -150,11 +171,12 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        self.async_sensor_list = self.async_sensor_list + self.gen_ant_sensor_list(product_id, self.ant_sensors)
+        print(self.cont_update_sensors)
+        self.cont_update_sensors.append(self.gen_ant_sensor_list(product_id, self.ant_sensors))
         yield self.subarray_katportals[product_id].connect()
         namespace = 'namespace_' + str(uuid.uuid4())
         result = yield self.subarray_katportals[product_id].subscribe(namespace)
-        for sensor in self.async_sensor_list:
+        for sensor in self.cont_update_sensors:
             result = yield self.subarray_katportals[product_id].set_sampling_strategies(namespace, sensor, 'event')
             print('Subscribed to sensor: {}'.format(sensor))
 
@@ -191,6 +213,7 @@ class BLKATPortalClient(object):
         schedule_blocks = self.io_loop.run_sync(lambda: self._get_future_targets(product_id))
         key = "{}:schedule_blocks".format(product_id)
         write_pair_redis(self.redis_server, key, json.dumps(schedule_blocks))
+        publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, key)
         # Start io_loop to listen to sensors whose values should be registered
         # immediately when they change.
         self.io_loop.add_callback(lambda: self.subscribe_sensors(product_id))

@@ -18,10 +18,9 @@ hashpipe_instances:
 - blpn63/0
 
 sensors_per_antenna:
--             
+- data_suspect           
 
 sensors_on_configure:
-- data_suspect
 
 sensors_cont_update:
 
