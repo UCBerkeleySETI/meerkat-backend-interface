@@ -17,11 +17,14 @@ hashpipe_instances:
 - blpn62/0
 - blpn63/0
 
-sensors_once_off:
-- band
+sensors_per_antenna:
+-             
 
-sensors_subscribe:
+sensors_on_configure:
 - data_suspect
+
+sensors_cont_update:
+
 
  
  

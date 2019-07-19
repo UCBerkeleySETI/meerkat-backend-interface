@@ -6,6 +6,8 @@ from katportalclient import KATPortalClient
 from katportalclient.client import SensorNotFoundError
 import redis
 from functools import partial
+import json
+import yaml
 
 from .redis_tools import (
     REDIS_CHANNELS,
@@ -46,14 +48,16 @@ class BLKATPortalClient(object):
 
     VERSION = 1.0
 
-    def __init__(self):
+    def __init__(self, config_file):
         """Our client server to the Katportal"""
         self.redis_server = redis.StrictRedis()
         self.p = self.redis_server.pubsub(ignore_subscribe_messages=True)
         self.io_loop = io_loop = tornado.ioloop.IOLoop.current()
         self.subarray_katportals = dict()  # indexed by product id's
+        self.config_file = config_file
         self.ant_sensors = ['data_suspect', 'pos_request_base_dec', 'pos_request_base_ra']  # sensors required from each antenna
-        self.async_sensor_list = []  # will be populated with sensors for subscription
+        self.cont_update_sensors = [] 
+        self.conf_sensors = []
 
     def MSG_TO_FUNCTION(self, msg_type):
         MSG_TO_FUNCTION_DICT = {
@@ -67,6 +71,10 @@ class BLKATPortalClient(object):
         return MSG_TO_FUNCTION_DICT.get(msg_type, self._other)
 
     def start(self):
+        try:
+            self.ant_sensors, self.conf_sensors, self.cont_update_sensors = self.configure(os.path.join(os.path.dirname(os.getcwd()), config_file))
+        except:
+            logger.warning('Configuration not updated; old configuration might be present.')
         self.p.subscribe(REDIS_CHANNELS.alerts)
         self._print_start_image()
         for message in self.p.listen():
@@ -119,6 +127,18 @@ class BLKATPortalClient(object):
             for sensor in ant_sensors:
                 ant_sensor_list.append(ant + '_' + sensor)
         return ant_sensor_list
+
+    def configure(cfg_file):
+        try:
+            with open(cfg_file, 'r') as f:
+                try:
+                    cfg = yaml.safe_load(f)
+                    return(cfg['sensors_per_antenna'], cfg['sensors_on_configure'],
+                    cfg['sensors_cont_update'])
+                except yaml.YAMLError as E:
+                    logger.error(E)
+        except IOError:
+            logger.error('Config file not found')
 
     @tornado.gen.coroutine
     def subscribe_sensors(self, product_id):

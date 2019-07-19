@@ -76,8 +76,8 @@ def cli():
     parser = OptionParser(usage=usage)
     parser.add_option('-p', '--port', dest='port', type=long,
                       help='Redis port to connect to', default=6379)
-    parser.add_option('-c', '--config_file', dest='cfg_file', type=str,
-                      help='Config filename (yaml)', default='cfg_coordinator.yaml')
+    parser.add_option('-c', '--config', dest='cfg_file', type=str,
+                      help='Config filename (yaml)', default = 'config.yml')
     (opts, args) = parser.parse_args()
     # if not opts.port:
     #     print "MissingArgument: Port number"

@@ -11,7 +11,6 @@ import tornado
 from meerkat_backend_interface.katcp_server import BLBackendInterface
 from meerkat_backend_interface.logger import set_logger
 
-
 def cli(prog=sys.argv[0]):
     usage = "{} [options]".format(prog)
     description = 'start BLUSE KATCP server'
@@ -79,7 +78,6 @@ def main(ip, port, debug):
 
     ioloop.add_callback(start)
     ioloop.start()
-
 
 if __name__ == "__main__":
     cli()
