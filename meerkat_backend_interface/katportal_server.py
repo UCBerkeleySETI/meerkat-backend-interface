@@ -74,7 +74,10 @@ class BLKATPortalClient(object):
 
     def start(self):
         try:
-            self.ant_sensors, self.conf_sensors, self.cont_update_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
+            ant_sensors, conf_sensors, cont_update_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
+            self.ant_sensors.append(filter(None, ant_sensors))
+            self.conf_sensors.append(filter(None, conf_sensors))
+            self.cont_update_sensors.append(filter(None, cont_update_sensors))
         except:
             logger.warning('Configuration not updated; old configuration might be present.')
         self.p.subscribe(REDIS_CHANNELS.alerts)
@@ -124,10 +127,6 @@ class BLKATPortalClient(object):
                 if(sum(ant_status) == 0): # all antennas show good data
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:'.format(product_id, False)) 
 
-
-
-        
-
     def gen_ant_sensor_list(self, product_id, ant_sensors):
         """Automatically builds a list of sensor names for each antenna.
 
@@ -142,11 +141,9 @@ class BLKATPortalClient(object):
         # Add sensors specific to antenna components for each antenna:
         ant_key = '{}:antennas'.format(product_id)
         ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))  # list of antennas
-        print(ant_list)
         for ant in ant_list:
             for sensor in ant_sensors:
                 ant_sensor_list.append(ant + '_' + sensor)
-        print(ant_sensor_list)
         return ant_sensor_list
 
     def configure_katportal(self, cfg_file):
@@ -154,7 +151,7 @@ class BLKATPortalClient(object):
             with open(cfg_file, 'r') as f:
                 try:
                     cfg = yaml.safe_load(f)
-                    return(cfg['sensors_per_antenna'], cfg['sensors_on_configure'],
+                    return(cfg['sensors_per_antenna'], cfg['sensors_on_configure'],           
                     cfg['sensors_cont_update'])
                 except yaml.YAMLError as E:
                     logger.error(E)
@@ -172,6 +169,7 @@ class BLKATPortalClient(object):
             None
         """
         print(self.cont_update_sensors)
+        print(self.gen_ant_sensor_list(product_id, self.ant_sensors))
         self.cont_update_sensors.append(self.gen_ant_sensor_list(product_id, self.ant_sensors))
         yield self.subarray_katportals[product_id].connect()
         namespace = 'namespace_' + str(uuid.uuid4())
