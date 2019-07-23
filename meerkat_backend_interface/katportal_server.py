@@ -81,6 +81,7 @@ class BLKATPortalClient(object):
                 self.conf_sensors.append(conf_sensors)
             if(cont_update_sensors is not None):
                 cont_update_sensors.append(cont_update_sensors)
+            logger.info('Configuration updated')
         except:
             logger.warning('Configuration not updated; old configuration might be present.')
         self.p.subscribe(REDIS_CHANNELS.alerts)
@@ -128,7 +129,7 @@ class BLKATPortalClient(object):
                 for i in range(len(ant_list)):
                     ant_status.append(self.redis_server.get('{}:{}_data_suspect'.format(product_id, ant_list[i])))
                 if(sum(ant_status) == 0): # all antennas show good data
-                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:'.format(product_id, False)) 
+                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:{}'.format(product_id, False)) 
 
     def gen_ant_sensor_list(self, product_id, ant_sensors):
         """Automatically builds a list of sensor names for each antenna.
@@ -171,15 +172,12 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        print(self.cont_update_sensors)
-        print(self.gen_ant_sensor_list(product_id, self.ant_sensors))
         self.cont_update_sensors.append(self.gen_ant_sensor_list(product_id, self.ant_sensors))
         yield self.subarray_katportals[product_id].connect()
         namespace = 'namespace_' + str(uuid.uuid4())
         result = yield self.subarray_katportals[product_id].subscribe(namespace)
         for sensor in self.cont_update_sensors:
             result = yield self.subarray_katportals[product_id].set_sampling_strategies(namespace, sensor, 'event')
-            print('Subscribed to sensor: {}'.format(sensor))
 
     def _configure(self, product_id):
         """Executes when configure request is processed
@@ -195,12 +193,16 @@ class BLKATPortalClient(object):
         #client = KATPortalClient(cam_url, on_update_callback=lambda x: self.on_update_callback_fn(product_id), logger=logger)
         self.subarray_katportals[product_id] = client
         logger.info("Created katportalclient object for : {}".format(product_id))
-        sensors_to_query = []  # TODO: add sensors to query on ?configure
-        sensors_and_values = self.io_loop.run_sync(
-            lambda: self._get_sensor_values(product_id, sensors_to_query))
-        for sensor_name, value in sensors_and_values.items():
-            key = "{}:{}".format(product_id, sensor_name)
-            write_pair_redis(self.redis_server, key, repr(value))
+        if(len(self.conf_sensors) > 0):
+            result = yield client.sensor_value(self.conf_sensors[0])
+            print(result)
+            print ('katportal')
+            #sensors_and_values = self.io_loop.run_sync(
+            #    lambda: self._get_sensor_values(product_id, self.conf_sensors))
+            for sensor_name, value in sensors_and_values.items():
+                key = "{}:{}".format(product_id, sensor_name)
+                write_pair_redis(self.redis_server, key, repr(value))
+        publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, '{}:conf_sensors_acquired'.format(product_id))
 
     def _capture_init(self, product_id):
         """Responds to capture-init request by getting schedule blocks

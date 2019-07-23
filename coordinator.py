@@ -69,7 +69,8 @@ def read_spead_addresses(spead_addrs, n_groups):
         addr_list = create_addr_list(addr0, n_groups, n_addrs)
     except ValueError:
         addr_list = [addrs + '+0']
-    return addr_list, port
+        n_addrs = 1
+    return addr_list, port, n_addrs
 
 def cli():
     usage = "usage: %prog [options]"
@@ -116,32 +117,32 @@ def main(port, cfg_file):
                 continue
             msg_type = msg_parts[0]
             product_id = msg_parts[1]
-            if msg_type == 'configure':
-                try:
-                    hashpipe_instances = configure(cfg_file)
-                    log.info('Configured from {}'.format(cfg_file))           
-                except:
-                    log.warning('Configuration not updated; old configuration might be present.')
+            if msg_type == 'conf_sensors_acquired':
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
-                addr_list, port = read_spead_addresses(streams.values()[0], len(hashpipe_instances))
-                nredchannels = len(addr_list)
-                for i in range(nredchannels):
+                addr_list, port, n_addrs = read_spead_addresses(streams.values()[0], len(hashpipe_instances))
+                n_red_chans = len(addr_list)
+                for i in range(n_red_chans):
                     msg = 'DESTIP={}'.format(addr_list[i])
-                    redchannel = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
-                    red.publish(redchannel, msg)
+                    red_channel = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
+                    red.publish(red_channel, msg)
                 red.publish(HPGDOMAIN + ':///set', 'BINDPORT=' + port)
-                nfreqchannels = red.get('{}:n_channels'.format(product_id))
-                red.publish(HPGDOMAIN + ':///set', 'FENCHAN=' + nfreqchannels)
+                red.publish(HPGDOMAIN + ':///set', 'FENSTRM=' + str(n_addrs))
+                n_freq_channels = red.get('{}:n_channels'.format(product_id))
+                red.publish(HPGDOMAIN + ':///set', 'FENCHAN=' + n_freq_channels)
+                n_chans_per_substream = red.get('{}:i0.antenna-channelised-voltage-n-chans-per-substream'.format(product_id))
+                red.publish(HPGDOMAIN + ':///set', 'HNCHAN=' + n_chans_per_substream)
+                spectra_per_heap = red.get('{}:i0.tied-array-channelised-voltage.0x-spectra-per-heap'.format(product_id))
+                red.publish(HPGDOMAIN + ':///set', 'HNTIME=' + spectra_per_heap)
             if msg_type == 'deconfigure':
-                redchannel = HPGDOMAIN + ':///set'
-                red.publish(redchannel, 'DESTIP=0.0.0.0')
+                red_channel = HPGDOMAIN + ':///set'
+                red.publish(red_channel, 'DESTIP=0.0.0.0')
             if msg_type == 'capture-start':
-                redchannel = HPGDOMAIN + ':///set'
-                red.publish(redchannel, 'NETSTAT=RECORD')
+                red_channel = HPGDOMAIN + ':///set'
+                red.publish(red_channel, 'NETSTAT=RECORD')
             if msg_type == 'capture-stop':
-                redchannel = HPGDOMAIN + ':///set'
-                red.publish(redchannel, 'NETSTAT=LISTEN')
+                red_channel = HPGDOMAIN + ':///set'
+                red.publish(red_channel, 'NETSTAT=LISTEN')
     except KeyboardInterrupt:
         log.info("Stopping coordinator")
         sys.exit(0)
