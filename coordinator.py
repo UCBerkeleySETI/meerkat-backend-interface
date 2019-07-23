@@ -89,8 +89,7 @@ def configure(cfg_file):
         with open(cfg_file, 'r') as f:
             try:
                 cfg = yaml.safe_load(f)
-                return(cfg['hashpipe_instances'], cfg['sensors_once_off'], 
-                cfg['sensors_subscribe'])
+                return(cfg['hashpipe_instances'])
             except yaml.YAMLError as E:
                 log.error(E)
     except IOError:
@@ -101,6 +100,11 @@ def main(port, cfg_file):
     logging.basicConfig(format=FORMAT)
     log.setLevel(logging.DEBUG)
     log.info("Starting coordinator")
+    try:
+        hashpipe_instances = configure(cfg_file)
+        log.info('Configured from {}'.format(cfg_file))
+    except:
+        log.warning('Configuration not updated; old configuration might be present.')
     red = redis.StrictRedis(port=port)
     ps = red.pubsub(ignore_subscribe_messages=True)
     ps.subscribe(CHANNEL)
@@ -114,27 +118,30 @@ def main(port, cfg_file):
             product_id = msg_parts[1]
             if msg_type == 'configure':
                 try:
-                    hashpipe_instances, sensors_once_off, sensors_subscribe = configure(cfg_file)           
+                    hashpipe_instances = configure(cfg_file)
+                    log.info('Configured from {}'.format(cfg_file))           
                 except:
                     log.warning('Configuration not updated; old configuration might be present.')
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
                 addr_list, port = read_spead_addresses(streams.values()[0], len(hashpipe_instances))
-                nchannels = len(addr_list)
-                for i in range(nchannels):
+                nredchannels = len(addr_list)
+                for i in range(nredchannels):
                     msg = 'DESTIP={}'.format(addr_list[i])
-                    channel = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
-                    red.publish(channel, msg)
+                    redchannel = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
+                    red.publish(redchannel, msg)
                 red.publish(HPGDOMAIN + ':///set', 'BINDPORT=' + port)
+                nfreqchannels = red.get('{}:n_channels'.format(product_id))
+                red.publish(HPGDOMAIN + ':///set', 'FENCHAN=' + nfreqchannels)
             if msg_type == 'deconfigure':
-                channel = HPGDOMAIN + ':///set'
-                red.publish(channel, 'DESTIP=0.0.0.0')
+                redchannel = HPGDOMAIN + ':///set'
+                red.publish(redchannel, 'DESTIP=0.0.0.0')
             if msg_type == 'capture-start':
-                channel = HPGDOMAIN + ':///set'
-                red.publish(channel, 'NETSTAT=RECORD')
+                redchannel = HPGDOMAIN + ':///set'
+                red.publish(redchannel, 'NETSTAT=RECORD')
             if msg_type == 'capture-stop':
-                channel = HPGDOMAIN + ':///set'
-                red.publish(channel, 'NETSTAT=LISTEN')
+                redchannel = HPGDOMAIN + ':///set'
+                red.publish(redchannel, 'NETSTAT=LISTEN')
     except KeyboardInterrupt:
         log.info("Stopping coordinator")
         sys.exit(0)
