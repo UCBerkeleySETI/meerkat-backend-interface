@@ -75,9 +75,12 @@ class BLKATPortalClient(object):
     def start(self):
         try:
             ant_sensors, conf_sensors, cont_update_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
-            self.ant_sensors.append(filter(None, ant_sensors))
-            self.conf_sensors.append(filter(None, conf_sensors))
-            self.cont_update_sensors.append(filter(None, cont_update_sensors))
+            if(ant_sensors is not None):
+                self.ant_sensors.append(ant_sensors)
+            if(conf_sensors is not None):
+                self.conf_sensors.append(conf_sensors)
+            if(cont_update_sensors is not None):
+                cont_update_sensors.append(cont_update_sensors)
         except:
             logger.warning('Configuration not updated; old configuration might be present.')
         self.p.subscribe(REDIS_CHANNELS.alerts)
