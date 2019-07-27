@@ -4,7 +4,7 @@ For the latest comprehensive documentation --> [ericjmichaud.com/meerkat-backend
 
 ---
 
-This repository is for the `KATCP Server` and `Katportal Client` modules of the below diagram. Together, these modules extract all observational metadata to enable Breakthrough Listen's commensal observing program at the MeerKAT telescope. These data include:
+This repository is for the `KATCP Server`, `Katportal Client` and `Coordinator`  modules of the below diagram. Together, these modules extract all observational metadata to enable Breakthrough Listen's commensal observing program at the MeerKAT telescope. These data include:
 * URLs of SPEAD packet streams containing raw voltage data, to be subscribed to by our Beam Former.
 * current target information
 * schedule block information
@@ -12,59 +12,8 @@ This repository is for the `KATCP Server` and `Katportal Client` modules of the 
 * etc...
 
 ###  Diagram of Breakthrough Listen To-Be-Built Software Stack at MeerKAT
-```
-        +----------+
-        |          |
-        |  KATCP   | Requests containing metadata
-        |  Server  | <------------------------+
-        |          |                          |
-        +--+-------+                          |               ,-.
-           |                                  |              / \  `.  __..-,O
-           |                                  |             :   \ --''_..-'.'
-           v                                  |             |    . .-' `. '.
-                                              |             :     .     .`.'
-        +----------+                     +----+-----+        \     `.  /  ..
-        |          |                     |          |         \      `.   ' .
-        |  Redis   |                     |          | +------> `,       `.   \
-+-------+  Server  |                     |   CAM    |          ,|,`.       `-.\
-|       |          |                     |          |        '.||  ``-...__..-`
-|       +------+---+                     |          | <-----+  |  |
-|              |                         +----+--+--+          |__|
-|          ^   |                              ^  |             /||\
-|          |   v                              |  |            //||\\
-|          |                                  |  |           // || \\
-|       +--+--------+                         |  |       ___//__||__\\___
-|       |           | Requests for metadata   |  |       '--------------'
-|       | Katportal +-------------------------+  |               |
-|       | Client    |           metadata         |               |
-|       |           | <--------------------------+               |
-|       +-----------+                                            |
-|                                                                |
-|                                                                |
-+------------+-------------------------+                         |
-             |                         |                         |
-             |                         |                         |
-             v                         v                         |
-        +----+------+             +----+------+                  |
-        | Real-time |             | Target    |                  |
-        | Signal    |             | Selection |   raw voltage    |
-        | Detection | <-----------+ &         | <----------------+
-        | and Data  |             | Beam      |      stream
-        | Storage   |             | Forming   |
-        +-----------+             +-----------+
 
-
- To be added:
- +-------------+
- | Stream      |
- | Distributor |
- +-------------+
-```
-
-## Description of modules in above diagram:
-
-### Telescope ASCII Art:
-Represents the actual antennas at the telescope. There are 64 of them.
+![diagram](diagram.png)
 
 ### CAM
 The **C**ontrol **A**nd **M**onitoring computers for the telescope. These are not maintained by us, but are what we interface with to acquire metadata.
