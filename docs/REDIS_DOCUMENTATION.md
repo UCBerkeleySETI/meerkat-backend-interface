@@ -75,8 +75,16 @@ Most of the keys published to redis will look like this, and are created from th
 
 * `[sensor_name]:[sensor_val]` --> sent when a sensor (which belongs to the list of sensors for subscription in the `KATPortal Client`) reports a new value.
 
-## Channel: `chan[n]`
+## Channel: `[HPGDOMAIN]://[hashpipe_instance]/set`
+SPEAD stream addresses are published along with other information to individual channels, one each per processing instance. 
+An example of a channel: `bluse://blpn48/0/set`. The messages published to this channel are formatted for use with the hashpipe-redis gateway.
 
-* `[product_id]:configure:stream:[addr_list[n]]` --> sent when a configure request is sent to the `KATCP Server`
+* `BINDPORT=[port]` --> port number for SPEAD streams.
+* `DESTIP=[SPEAD addresses]` --> IP addresses for SPEAD streams. 
 
+## Channel: `[HPGDOMAIN]:///set`
+Messages published to this channel are received by all processing instances.
 
+* `DESTIP=0.0.0.0` --> Message to unsubscribe to streams (sent on deconfigure).
+* `NETSTAT=RECORD` --> Message to start recording data, sent when`capture-start` is published to the `alerts` channel.
+* `NETSTAT=LISTEN` --> Message to stop recording data, sent when `capture-stop` is published to the `alerts` channel.
