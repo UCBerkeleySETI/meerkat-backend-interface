@@ -117,7 +117,7 @@ def main(port, cfg_file):
                 continue
             msg_type = msg_parts[0]
             product_id = msg_parts[1]
-            if msg_type == 'conf_sensors_acquired':
+            if msg_type == 'conf_complete':
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
                 addr_list, port, n_addrs = read_spead_addresses(streams.values()[0], len(hashpipe_instances))
@@ -130,9 +130,9 @@ def main(port, cfg_file):
                 red.publish(HPGDOMAIN + ':///set', 'FENSTRM=' + str(n_addrs))
                 n_freq_channels = red.get('{}:n_channels'.format(product_id))
                 red.publish(HPGDOMAIN + ':///set', 'FENCHAN=' + n_freq_channels)
-                n_chans_per_substream = red.get('{}:i0.antenna-channelised-voltage-n-chans-per-substream'.format(product_id))
+                n_chans_per_substream = red.get('{}:cbf_{}_i0_antenna_channelised_voltage_n_chans_per_substream'.format(product_id, product_id[-1]))
                 red.publish(HPGDOMAIN + ':///set', 'HNCHAN=' + n_chans_per_substream)
-                spectra_per_heap = red.get('{}:i0.tied-array-channelised-voltage.0x-spectra-per-heap'.format(product_id))
+                spectra_per_heap = red.get('{}:cbf_{}_i0_tied_array_channelised_voltage_0x_spectra_per_heap'.format(product_id, product_id[-1]))
                 red.publish(HPGDOMAIN + ':///set', 'HNTIME=' + spectra_per_heap)
             if msg_type == 'deconfigure':
                 red_channel = HPGDOMAIN + ':///set'

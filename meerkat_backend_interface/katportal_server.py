@@ -58,7 +58,7 @@ class BLKATPortalClient(object):
         self.config_file = config_file
         self.ant_sensors = []  # sensors required from each antenna
         self.cont_update_sensors = []  # other sensors for continuous update
-        self.conf_sensors = []  # sensors to be queried once-off on configure
+        self.cbf_conf_sensors = []  # cbf sensors to be queried once-off on configure
         self.config_file = config_file #check if needed
 
     def MSG_TO_FUNCTION(self, msg_type):
@@ -68,19 +68,20 @@ class BLKATPortalClient(object):
             'capture-start': self._capture_start,
             'capture-stop' : self._capture_stop,
             'capture-done' : self._capture_done,
-            'deconfigure'  : self._deconfigure
+            'deconfigure'  : self._deconfigure,
+            'conf_complete' : self._conf_complete
         }
         return MSG_TO_FUNCTION_DICT.get(msg_type, self._other)
 
     def start(self):
         try:
-            ant_sensors, conf_sensors, cont_update_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
+            ant_sensors, cbf_conf_sensors, cont_update_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
             if(ant_sensors is not None):
-                self.ant_sensors.append(ant_sensors)
-            if(conf_sensors is not None):
-                self.conf_sensors.append(conf_sensors)
+                self.ant_sensors.extend(ant_sensors)
+            if(cbf_conf_sensors is not None):
+                self.cbf_conf_sensors.extend(cbf_conf_sensors)
             if(cont_update_sensors is not None):
-                cont_update_sensors.append(cont_update_sensors)
+                cont_update_sensors.extend(cont_update_sensors)
             logger.info('Configuration updated')
         except:
             logger.warning('Configuration not updated; old configuration might be present.')
@@ -155,7 +156,7 @@ class BLKATPortalClient(object):
             with open(cfg_file, 'r') as f:
                 try:
                     cfg = yaml.safe_load(f)
-                    return(cfg['sensors_per_antenna'], cfg['sensors_on_configure'],           
+                    return(cfg['sensors_per_antenna'], cfg['cbf_sensors_on_configure'],           
                     cfg['sensors_cont_update'])
                 except yaml.YAMLError as E:
                     logger.error(E)
@@ -193,16 +194,15 @@ class BLKATPortalClient(object):
         #client = KATPortalClient(cam_url, on_update_callback=lambda x: self.on_update_callback_fn(product_id), logger=logger)
         self.subarray_katportals[product_id] = client
         logger.info("Created katportalclient object for : {}".format(product_id))
-        if(len(self.conf_sensors) > 0):
-            result = yield client.sensor_value(self.conf_sensors[0])
-            print(result)
-            print ('katportal')
-            #sensors_and_values = self.io_loop.run_sync(
-            #    lambda: self._get_sensor_values(product_id, self.conf_sensors))
-            for sensor_name, value in sensors_and_values.items():
+        if(len(self.cbf_conf_sensors) > 0):
+            #Complete the CBF sensor names with product ID number
+            self.cbf_conf_sensors = ['cbf_{}_'.format(product_id[-1]) + sensor for sensor in self.cbf_conf_sensors]
+            sensors_and_values = self.io_loop.run_sync(
+                lambda: self._get_sensor_values(product_id, self.cbf_conf_sensors))
+            for sensor_name, details in sensors_and_values.items():
                 key = "{}:{}".format(product_id, sensor_name)
-                write_pair_redis(self.redis_server, key, repr(value))
-        publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, '{}:conf_sensors_acquired'.format(product_id))
+                write_pair_redis(self.redis_server, key, repr(details['value']))
+        publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 'conf_complete:{}'.format(product_id))
 
     def _capture_init(self, product_id):
         """Responds to capture-init request by getting schedule blocks
@@ -311,6 +311,17 @@ class BLKATPortalClient(object):
             None
         """
         logger.warning("Unrecognized alert : {}".format(message['data']))
+
+    def _conf_complete(self, product_id):
+        """Called when sensor values for acquisition on configure have been acquired.
+        
+        Args: 
+            product_id (str): the product ID given in the configure request.
+
+        Returns:
+            None
+        """
+        logger.info("Sensor values on configure acquired for {}.".format(product_id))
 
     @tornado.gen.coroutine
     def _get_future_targets(self, product_id):

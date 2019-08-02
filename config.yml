@@ -20,9 +20,9 @@ hashpipe_instances:
 sensors_per_antenna:
 - data_suspect           
 
-sensors_on_configure:
-- cbf_2_i0_antenna_channelised_voltage_n_chans_per_substream
-#- spectra_per_heap
+cbf_sensors_on_configure:
+- i0_antenna_channelised_voltage_n_chans_per_substream
+- i0_tied_array_channelised_voltage_0x_spectra_per_heap
 
 sensors_cont_update:
 
