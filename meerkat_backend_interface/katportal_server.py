@@ -9,6 +9,7 @@ from functools import partial
 import json
 import yaml
 import os
+import ast
 
 from .redis_tools import (
     REDIS_CHANNELS,
@@ -95,9 +96,6 @@ class BLKATPortalClient(object):
             msg_type = msg_parts[0]
             product_id = msg_parts[1]
             self.MSG_TO_FUNCTION(msg_type)(product_id)
-            # write last message to redis
-            key = '{}:last_message'.format(product_id)
-            write_pair_redis(self.redis_server, key, repr(msg_type))          
 
     def on_update_callback_fn(self, product_id, msg):
         """Handler for messages published over sensor websockets.
@@ -120,17 +118,22 @@ class BLKATPortalClient(object):
                     write_pair_redis(self.redis_server, key, repr(sensor_value)) # ultimately this line may not be needed
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}'.format(sensor_name, sensor_value))
                 # subarray data-suspect
-                self.subarray_data_suspect(product_id, sensor_name)
+                if('data_suspect' in sensor_name):
+                    self.subarray_data_suspect(product_id, sensor_name)
 
     def subarray_data_suspect(self, product_id, sensor_name):
-        if self.redis_server.get('{}:last_message'.format(product_id)) in ['capture-init', 'capture-start', 'capture-stop']:
-            if('data_suspect' in sensor_name):
-                ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
-                ant_status = []
-                for i in range(len(ant_list)):
-                    ant_status.append(self.redis_server.get('{}:{}_data_suspect'.format(product_id, ant_list[i])))
-                if(sum(ant_status) == 0): # all antennas show good data
-                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:{}'.format(product_id, False)) 
+        logger.info('subarray suspect invoked')
+	logger.info('data suspect insensor name')
+        ant_key = '{}:antennas'.format(product_id)
+	ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
+	ant_status = []
+	for i in range(len(ant_list)):
+	    ant_status.append(ast.literal_eval(self.redis_server.get('{}:{}_data_suspect'.format(product_id, ant_list[i]))))
+	logger.info(ant_status)
+        if(sum(ant_status) == 0): # all antennas show good data
+	    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:{}'.format(product_id, False)) 
+        else: 
+            publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:{}'.format(product_id, True))
 
     def gen_ant_sensor_list(self, product_id, ant_sensors):
         """Automatically builds a list of sensor names for each antenna.
@@ -173,7 +176,7 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        self.cont_update_sensors.append(self.gen_ant_sensor_list(product_id, self.ant_sensors))
+        self.cont_update_sensors.extend(self.gen_ant_sensor_list(product_id, self.ant_sensors))
         yield self.subarray_katportals[product_id].connect()
         namespace = 'namespace_' + str(uuid.uuid4())
         result = yield self.subarray_katportals[product_id].subscribe(namespace)
