@@ -122,8 +122,6 @@ class BLKATPortalClient(object):
                     self.subarray_data_suspect(product_id, sensor_name)
 
     def subarray_data_suspect(self, product_id, sensor_name):
-        logger.info('subarray suspect invoked')
-	logger.info('data suspect insensor name')
         ant_key = '{}:antennas'.format(product_id)
 	ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
 	ant_status = []
