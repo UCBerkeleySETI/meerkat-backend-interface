@@ -144,10 +144,6 @@ def main(port, cfg_file):
                 streams = all_streams[STREAM_TYPE]
                 addr_list, port, n_addrs = read_spead_addresses(streams.values()[0], len(hashpipe_instances), streams_per_instance)
                 n_red_chans = len(addr_list)
-                for i in range(n_red_chans):
-                    msg = 'DESTIP={}'.format(addr_list[i])
-                    red_channel = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
-                    red.publish(red_channel, msg)
                 red.publish(HPGDOMAIN + ':///set', 'BINDPORT=' + port)
                 red.publish(HPGDOMAIN + ':///set', 'FENSTRM=' + str(n_addrs))
                 n_freq_channels = red.get('{}:n_channels'.format(product_id))
@@ -156,6 +152,15 @@ def main(port, cfg_file):
                 red.publish(HPGDOMAIN + ':///set', 'HNCHAN=' + n_chans_per_substream)
                 spectra_per_heap = red.get('{}:cbf_{}_i0_tied_array_channelised_voltage_0x_spectra_per_heap'.format(product_id, product_id[-1]))
                 red.publish(HPGDOMAIN + ':///set', 'HNTIME=' + spectra_per_heap)
+                for i in range(n_red_chans):
+                    red_channel = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
+                    msg = 'DESTIP={}'.format(addr_list[i])
+                    red.publish(red_channel, msg)
+                    n_streams_per_instance = int(addr_list[i][-1])+1
+                    msg = 'NSTRM={}'.format(n_streams_per_instance)
+                    red.publish(red_channel, msg)
+                    msg = 'NCHAN={}'.format(n_streams_per_instance*int(n_chans_per_substream))
+                    red.publish(red_channel, msg)
             if msg_type == 'deconfigure':
                 red_channel = HPGDOMAIN + ':///set'
                 red.publish(red_channel, 'DESTIP=0.0.0.0')
