@@ -28,8 +28,30 @@ def json_str_formatter(str_dict):
     str_dict = str_dict.replace('u', '')  # Remove unicode 'u'
     return str_dict
 
-def create_addr_list(addr0, n_groups, n_addrs):
+def create_addr_list_filled(addr0, n_groups, n_addrs, streams_per_instance):
     """Creates list of IP multicast subscription address groups.
+    Fills the list for each available processing instance 
+    sequentially untill all streams have been assigned.
+    """
+    prefix, suffix0 = addr0.rsplit('.', 1)
+    addr_list = []
+    if(n_addrs > streams_per_instance*n_groups):
+        log.warning('Too many streams: {} will not be processed.'.format(n_addrs - streams_per_instance*n_groups))
+        for i in range(0, n_groups):
+            addr_list.append(prefix + '.{}+{}'.format(int(suffix0), streams_per_instance - 1))
+            suffix0 = int(suffix0) + streams_per_instance
+    else:
+        n_instances_req = int(np.ceil(n_addrs/float(streams_per_instance)))
+        for i in range(1, n_instances_req):
+            addr_list.append(prefix + '.{}+{}'.format(int(suffix0), streams_per_instance - 1))
+            suffix0 = int(suffix0) + streams_per_instance
+        addr_list.append(prefix + '.{}+{}'.format(int(suffix0), n_addrs - 1 - i*streams_per_instance))
+    return addr_list
+
+def create_addr_list_distributed(addr0, n_groups, n_addrs):
+    """Creates list of IP multicast subscription address groups.
+    Attempts to divide the number of streams equally by the number
+    of available processing instances.     
 
     Args:
         addr0 (str): first IP address in the list.
@@ -49,7 +71,7 @@ def create_addr_list(addr0, n_groups, n_addrs):
         suffix0 = int(suffix0) + n_per_group[i]
     return addr_list
 
-def read_spead_addresses(spead_addrs, n_groups):
+def read_spead_addresses(spead_addrs, n_groups, streams_per_instance):
     """Parses spead addresses given in the format: spead://<ip>+<count>:<port>
     Assumes this format.
 
@@ -66,7 +88,7 @@ def read_spead_addresses(spead_addrs, n_groups):
     try:
         addr0, n_addrs = addrs.split('+')
         n_addrs = int(n_addrs) + 1
-        addr_list = create_addr_list(addr0, n_groups, n_addrs)
+        addr_list = create_addr_list_filled(addr0, n_groups, n_addrs, streams_per_instance)
     except ValueError:
         addr_list = [addrs + '+0']
         n_addrs = 1
@@ -90,7 +112,7 @@ def configure(cfg_file):
         with open(cfg_file, 'r') as f:
             try:
                 cfg = yaml.safe_load(f)
-                return(cfg['hashpipe_instances'])
+                return(cfg['hashpipe_instances'], cfg['streams_per_instance'][0])
             except yaml.YAMLError as E:
                 log.error(E)
     except IOError:
@@ -102,7 +124,7 @@ def main(port, cfg_file):
     log.setLevel(logging.DEBUG)
     log.info("Starting coordinator")
     try:
-        hashpipe_instances = configure(cfg_file)
+        hashpipe_instances, streams_per_instance = configure(cfg_file)
         log.info('Configured from {}'.format(cfg_file))
     except:
         log.warning('Configuration not updated; old configuration might be present.')
@@ -120,7 +142,7 @@ def main(port, cfg_file):
             if msg_type == 'conf_complete':
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
-                addr_list, port, n_addrs = read_spead_addresses(streams.values()[0], len(hashpipe_instances))
+                addr_list, port, n_addrs = read_spead_addresses(streams.values()[0], len(hashpipe_instances), streams_per_instance)
                 n_red_chans = len(addr_list)
                 for i in range(n_red_chans):
                     msg = 'DESTIP={}'.format(addr_list[i])

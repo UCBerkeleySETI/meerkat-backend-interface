@@ -1,4 +1,8 @@
-# .yaml configuration file for the coordinator.
+# .yaml configuration file for coordinator.py and katportal_server.py.
+
+# Temporary; to be calculated by a function in future.
+streams_per_instance: 
+- 2
 
 hashpipe_instances:
 - blpn48/0
