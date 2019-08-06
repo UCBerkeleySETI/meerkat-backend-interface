@@ -60,6 +60,7 @@ class BLKATPortalClient(object):
         self.ant_sensors = []  # sensors required from each antenna
         self.cont_update_sensors = []  # other sensors for continuous update
         self.cbf_conf_sensors = []  # cbf sensors to be queried once-off on configure
+        self.conf_sensors = [] # other sensors to be queried once-off on configure
         self.config_file = config_file #check if needed
 
     def MSG_TO_FUNCTION(self, msg_type):
@@ -76,13 +77,15 @@ class BLKATPortalClient(object):
 
     def start(self):
         try:
-            ant_sensors, cbf_conf_sensors, cont_update_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
+            ant_sensors, cbf_conf_sensors, cont_update_sensors, conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
             if(ant_sensors is not None):
                 self.ant_sensors.extend(ant_sensors)
             if(cbf_conf_sensors is not None):
                 self.cbf_conf_sensors.extend(cbf_conf_sensors)
             if(cont_update_sensors is not None):
-                cont_update_sensors.extend(cont_update_sensors)
+                self.cont_update_sensors.extend(cont_update_sensors)
+            if(conf_sensors is not None):
+                self.conf_sensors.extend(conf_sensors)
             logger.info('Configuration updated')
         except:
             logger.warning('Configuration not updated; old configuration might be present.')
@@ -188,7 +191,7 @@ class BLKATPortalClient(object):
                 try:
                     cfg = yaml.safe_load(f)
                     return(cfg['sensors_per_antenna'], cfg['cbf_sensors_on_configure'],           
-                    cfg['sensors_cont_update'])
+                    cfg['sensors_cont_update'], cfg['sensors_on_configure'])
                 except yaml.YAMLError as E:
                     logger.error(E)
         except IOError:
@@ -225,6 +228,13 @@ class BLKATPortalClient(object):
         #client = KATPortalClient(cam_url, on_update_callback=lambda x: self.on_update_callback_fn(product_id), logger=logger)
         self.subarray_katportals[product_id] = client
         logger.info("Created katportalclient object for : {}".format(product_id))
+        if(len(self.conf_sensors) > 0):
+            self.conf_sensors = ['subarray_{}_'.format(product_id[-1]) + sensor for sensor in self.conf_sensors]
+            sensors_and_values = self.io_loop.run_sync(
+                lambda: self._get_sensor_values(product_id, self.conf_sensors))
+            for sensor_name, details in sensors_and_values.items():
+                key = "{}:{}".format(product_id, sensor_name)
+                write_pair_redis(self.redis_server, key, repr(details['value']))
         if(len(self.cbf_conf_sensors) > 0):
             #Complete the CBF sensor names with product ID number
             self.cbf_conf_sensors = ['cbf_{}_'.format(product_id[-1]) + sensor for sensor in self.cbf_conf_sensors]
