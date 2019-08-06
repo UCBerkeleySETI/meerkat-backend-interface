@@ -115,26 +115,56 @@ class BLKATPortalClient(object):
                 # sensors for continuous update
                 if sensor_name in self.cont_update_sensors:
                     key = "{}:{}".format(product_id, sensor_name)
-                    write_pair_redis(self.redis_server, key, repr(sensor_value)) # ultimately this line may not be needed
-                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}'.format(sensor_name, sensor_value))
+                    write_pair_redis(self.redis_server, key, repr(sensor_value))
+                    #publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}'.format(sensor_name, sensor_value))
                 # subarray data-suspect
                 if('data_suspect' in sensor_name):
-                    self.subarray_data_suspect(product_id, sensor_name)
+                    self.subarray_data_suspect(product_id)
+                # subarray target
+                if('target' in sensor_name):
+                    self.subarray_consensus(product_id, 'target')
 
-    def subarray_data_suspect(self, product_id, sensor_name):
+    def subarray_data_suspect(self, product_id):
         ant_key = '{}:antennas'.format(product_id)
 	ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
 	ant_status = []
-	for i in range(len(ant_list)):
-	    ant_status.append(ast.literal_eval(self.redis_server.get('{}:{}_data_suspect'.format(product_id, ant_list[i]))))
-	logger.info(ant_status)
-        if(sum(ant_status) == 0): # all antennas show good data
-	    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:{}'.format(product_id, False)) 
-        else: 
+        try:
+	    for i in range(len(ant_list)):
+	        ant_status.append(ast.literal_eval(self.redis_server.get('{}:{}_data_suspect'.format(product_id, ant_list[i]))))
+            if(sum(ant_status) == 0): # all antennas show good data
+	        publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:{}'.format(product_id, False)) 
+            else: 
+                publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:{}'.format(product_id, True))
+        except:
+            # If any of the sensors are not available, set subarray data suspect flag to True
             publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:{}'.format(product_id, True))
+
+    def subarray_consensus(self, product_id, sensor_name):
+        ant_key = '{}:antennas'.format(product_id)
+        ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))
+        ant_status = ''
+        ant_compare = ''
+        try:
+            for i in range(len(ant_list)):
+                ant_status = ant_status + self.redis_server.get('{}:{}_{}'.format(product_id, ant_list[i], sensor_name))  
+            ant_compare = ant_compare + self.redis_server.get('{}:{}_{}'.format(product_id, ant_list[0], sensor_name))*len(ant_list)
+            if(ant_status == ant_compare): # all antennas show the same value
+                # Get value from last antenna
+                value = ast.literal_eval(self.redis_server.get('{}:{}_{}'.format(product_id, ant_list[i], sensor_name))) 
+                if(len(value)>0):
+                    logger.info(value)
+                    logger.info(len(value))
+                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:{}'.format(product_id, sensor_name, value))
+                else:
+                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:unavailable'.format(product_id, sensor_name))
+        except:
+            # If any of the sensors are not available:
+            publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:unavailable'.format(product_id, sensor_name))
 
     def gen_ant_sensor_list(self, product_id, ant_sensors):
         """Automatically builds a list of sensor names for each antenna.
+           Initialises these sensors to their current value where possible,
+           or to 'unavailable' if not available.
 
         Args:
             product_id (str): the product id given in the ?configure request
@@ -240,12 +270,7 @@ class BLKATPortalClient(object):
             None, but does many things!
         """
         # TODO: get more information?
-        sensors_to_query = ['target', 'pos_request_base_ra', 'pos_request_base_dec', 'weight', 'ap_on_target']
-        sensors_and_values = self.io_loop.run_sync(
-            lambda: self._get_sensor_values(product_id, sensors_to_query))
-        for sensor_name, value in sensors_and_values.items():
-            key = "{}:{}".format(product_id, sensor_name)
-            write_pair_redis(self.redis_server, key, repr(value))
+        pass
 
     def _capture_stop(self, product_id):
         """Responds to capture-stop request
