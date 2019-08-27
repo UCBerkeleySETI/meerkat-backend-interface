@@ -70,6 +70,7 @@ Most of the keys published to redis will look like this, and are created from th
 * `capture-stop:[product_id]` --> sent when a capture-stop request is sent to the `KATCP Server`. Gives the associated product_id. Signals the end of an observation. Should be used to trigger other modules to stop ingesting data.
 * `capture-done:[product_id]` --> sent when a capture-done request is sent to the `KATCP Server`. Gives the associated product_id. Signals that the current program block is done.
 * `deconfigure:[product_id]` --> sent when a deconfigure request is sent to the `KATCP Server`. Gives the associated product_id
+* `conf_complete:[product_id]` --> sent when all the sensor data associated with the `configure` stage of an observation have been collected and stored.
 
 ## Channel: `sensor_alerts`
 
