@@ -73,18 +73,25 @@ Most of the keys published to redis will look like this, and are created from th
 
 ## Channel: `sensor_alerts`
 
-* `[sensor_name]:[sensor_val]` --> sent when a sensor (which belongs to the list of sensors for subscription in the `KATPortal Client`) reports a new value.
+* `[sensor_name]:[sensor_val]` --> Sent when a sensor (which belongs to the list of sensors for subscription in the `KATPortal Client`) reports a new value.
+* `[product_id]:data_suspect:[value]` --> Value of data-suspect for the full subarray (only `False` if all the antennas in the subarray indicate `False`.
 
 ## Channel: `[HPGDOMAIN]://[hashpipe_instance]/set`
 SPEAD stream addresses are published along with other information to individual channels, one each per processing instance. 
 An example of a channel: `bluse://blpn48/0/set`. The messages published to this channel are formatted for use with the hashpipe-redis gateway.
 
-* `BINDPORT=[port]` --> port number for SPEAD streams.
 * `DESTIP=[SPEAD addresses]` --> IP addresses for SPEAD streams. 
+* `NSTRM=[num streams]` --> Number of streams apportioned to each processing instance.
+* `NCHAN=[num channels]` --> Total number of channels to be processed by a particular processing instance. 
 
 ## Channel: `[HPGDOMAIN]:///set`
 Messages published to this channel are received by all processing instances.
 
+* `BINDPORT=[port]` --> Port number for SPEAD streams.
 * `DESTIP=0.0.0.0` --> Message to unsubscribe to streams (sent on deconfigure).
 * `NETSTAT=RECORD` --> Message to start recording data, sent when`capture-start` is published to the `alerts` channel.
 * `NETSTAT=LISTEN` --> Message to stop recording data, sent when `capture-stop` is published to the `alerts` channel.
+* `FENCHAN=[num channels]` --> Total number of channels received on configure. 
+* `FENSTRM=[num streams]` --> Total number of streams received on configure. 
+* `HNCHAN=[channels per substream]` --> Number of channels per substream.
+* `HNTIME=[spectra per heap]` --> Number of spectra per heap. 
