@@ -1,6 +1,6 @@
 # meerkat-backend-interface
 
-Redis Documentation: [Redis Documentation](docs/REDIS_DOCUMENTATION.md)
+[Redis Documentation](docs/REDIS_DOCUMENTATION.md)
 
 This repository is for the `KATCP Server`, `Katportal Client` and `Coordinator`  modules of the diagram below. Together, these modules extract all observational metadata to enable Breakthrough Listen's automated commensal observing program on MeerKAT. These data include:
 * Addresses of SPEAD packet streams containing raw channelised antenna voltage data, to be subscribed to by our processing nodes for beamforming.
