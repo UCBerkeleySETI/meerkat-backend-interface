@@ -76,19 +76,19 @@ class BLKATPortalClient(object):
         return MSG_TO_FUNCTION_DICT.get(msg_type, self._other)
 
     def start(self):
-        try:
-            ant_sensors, cbf_conf_sensors, cont_update_sensors, conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
-            if(ant_sensors is not None):
-                self.ant_sensors.extend(ant_sensors)
-            if(cbf_conf_sensors is not None):
-                self.cbf_conf_sensors.extend(cbf_conf_sensors)
-            if(cont_update_sensors is not None):
-                self.cont_update_sensors.extend(cont_update_sensors)
-            if(conf_sensors is not None):
-                self.conf_sensors.extend(conf_sensors)
-            logger.info('Configuration updated')
-        except:
-            logger.warning('Configuration not updated; old configuration might be present.')
+        #try:
+        #    ant_sensors, cbf_conf_sensors, cont_update_sensors, conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
+        #    if(ant_sensors is not None):
+        #        self.ant_sensors.extend(ant_sensors)
+        #    if(cbf_conf_sensors is not None):
+        #        self.cbf_conf_sensors.extend(cbf_conf_sensors)
+       #     if(cont_update_sensors is not None):
+     #           self.cont_update_sensors.extend(cont_update_sensors)
+   #         if(conf_sensors is not None):
+   #             self.conf_sensors.extend(conf_sensors)
+   #         logger.info('Configuration updated')
+   #     except:
+   #         logger.warning('Configuration not updated; old configuration might be present.')
         self.p.subscribe(REDIS_CHANNELS.alerts)
         self._print_start_image()
         for message in self.p.listen():
@@ -155,8 +155,6 @@ class BLKATPortalClient(object):
                 # Get value from last antenna
                 value = ast.literal_eval(self.redis_server.get('{}:{}_{}'.format(product_id, ant_list[i], sensor_name))) 
                 if(len(value)>0):
-                    logger.info(value)
-                    logger.info(len(value))
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:{}'.format(product_id, sensor_name, value))
                 else:
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:unavailable'.format(product_id, sensor_name))
@@ -223,6 +221,20 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
+        # Update configuration:
+        try:
+            ant_sensors, cbf_conf_sensors, cont_update_sensors, conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
+            if(ant_sensors is not None):
+                self.ant_sensors.extend(ant_sensors)
+            if(cbf_conf_sensors is not None):
+                self.cbf_conf_sensors.extend(cbf_conf_sensors)
+            if(cont_update_sensors is not None):
+                self.cont_update_sensors.extend(cont_update_sensors)
+            if(conf_sensors is not None):
+                self.conf_sensors.extend(conf_sensors)
+            logger.info('Configuration updated')
+        except:
+            logger.warning('Configuration not updated; old configuration might be present.')
         cam_url = self.redis_server.get("{}:{}".format(product_id, 'cam:url'))
         client = KATPortalClient(cam_url, on_update_callback=partial(self.on_update_callback_fn, product_id), logger=logger)
         #client = KATPortalClient(cam_url, on_update_callback=lambda x: self.on_update_callback_fn(product_id), logger=logger)
@@ -230,6 +242,7 @@ class BLKATPortalClient(object):
         logger.info("Created katportalclient object for : {}".format(product_id))
         if(len(self.conf_sensors) > 0):
             self.conf_sensors = ['subarray_{}_'.format(product_id[-1]) + sensor for sensor in self.conf_sensors]
+            logger.info(self.conf_sensors)
             sensors_and_values = self.io_loop.run_sync(
                 lambda: self._get_sensor_values(product_id, self.conf_sensors))
             for sensor_name, details in sensors_and_values.items():
@@ -238,6 +251,7 @@ class BLKATPortalClient(object):
         if(len(self.cbf_conf_sensors) > 0):
             #Complete the CBF sensor names with product ID number
             self.cbf_conf_sensors = ['cbf_{}_'.format(product_id[-1]) + sensor for sensor in self.cbf_conf_sensors]
+            logger.info(self.conf_sensors)   
             sensors_and_values = self.io_loop.run_sync(
                 lambda: self._get_sensor_values(product_id, self.cbf_conf_sensors))
             for sensor_name, details in sensors_and_values.items():
@@ -405,6 +419,7 @@ class BLKATPortalClient(object):
         sensor_names = yield client.sensor_names(targets)
         if not sensor_names:
             logger.warning("No matching sensors found!")
+            logger.info(targets)
         else:
             for sensor_name in sensor_names:
                 try:
