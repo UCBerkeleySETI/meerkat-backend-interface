@@ -233,7 +233,6 @@ class BLKATPortalClient(object):
         logger.info("Created katportalclient object for : {}".format(product_id))
         if(len(self.conf_sensors) > 0):
             conf_sensor_names = ['subarray_{}_'.format(product_id[-1]) + sensor for sensor in self.conf_sensors]
-            logger.info(conf_sensor_names)
             sensors_and_values = self.io_loop.run_sync(
                 lambda: self._get_sensor_values(product_id, conf_sensor_names))
             for sensor_name, details in sensors_and_values.items():
@@ -242,7 +241,6 @@ class BLKATPortalClient(object):
         if(len(self.cbf_conf_sensors) > 0):
             #Complete the CBF sensor names with product ID number
             cbf_conf_sensor_names = ['cbf_{}_'.format(product_id[-1]) + sensor for sensor in self.cbf_conf_sensors]
-            logger.info(cbf_conf_sensor_names)   
             sensors_and_values = self.io_loop.run_sync(
                 lambda: self._get_sensor_values(product_id, cbf_conf_sensor_names))
             for sensor_name, details in sensors_and_values.items():
