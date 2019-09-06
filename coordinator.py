@@ -170,16 +170,22 @@ def main(port, cfg_file):
                 adc_per_heap = int(adc_per_spectra)*int(spectra_per_heap)
                 red.publish(HPGDOMAIN + ':///set', 'HCLOCKS=' + str(adc_per_heap))
 
-
                 for i in range(n_red_chans):
                     red_channel = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
+                    # Destination IP addresses for instance i
                     msg = 'DESTIP={}'.format(addr_list[i])
                     red.publish(red_channel, msg)
                     n_streams_per_instance = int(addr_list[i][-1])+1
+                    # Number of streams for instance i
                     msg = 'NSTRM={}'.format(n_streams_per_instance)
                     red.publish(red_channel, msg)
+                    # Number of channels dealt with by instance i
                     msg = 'NCHAN={}'.format(n_streams_per_instance*int(n_chans_per_substream))
                     red.publish(red_channel, msg)
+                    # Absolute starting channel for instance i
+                    s_chan = i*n_streams_per_instance*int(n_chans_per_substream)
+                    red.publish(red_channel, 'SCHAN=' + str(s_chan))
+                          
             if msg_type == 'deconfigure':
                 red_channel = HPGDOMAIN + ':///set'
                 red.publish(red_channel, 'DESTIP=0.0.0.0')
