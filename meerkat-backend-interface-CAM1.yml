@@ -1,0 +1,37 @@
+# .yaml configuration file for coordinator.py and katportal_server.py.
+
+# Temporary; to be calculated by a function in future.
+streams_per_instance:
+- 1
+
+hashpipe_instances:
+- blpn48/0
+- blpn49/0
+- blpn50/0
+- blpn51/0
+- blpn52/0
+- blpn53/0
+- blpn54/0
+- blpn55/0
+- blpn56/0
+- blpn57/0
+- blpn58/0
+- blpn59/0
+- blpn61/0
+- blpn62/0
+- blpn63/0
+
+sensors_per_antenna:
+- data_suspect
+- target
+
+sensors_on_configure:
+- pool_resources
+
+cbf_sensors_on_configure:
+- i0_antenna_channelised_voltage_n_chans_per_substream
+- i0_tied_array_channelised_voltage_0x_spectra_per_heap
+- i0_sync_time
+- i0_antenna_channelised_voltage_n_samples_between_spectra
+
+sensors_cont_update:

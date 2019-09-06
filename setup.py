@@ -20,6 +20,7 @@ requires = [
     'katpoint',
     'lxml==4.2.3',
     'MarkupSafe==1.0',
+    #'numpy=1.16.4',
     'omnijson==0.1.2',
     'pipreqs==0.4.9',
     'ply==3.11',
@@ -75,7 +76,7 @@ setuptools.setup(
         'console_scripts': [
             'coordinator = coordinator:cli',
             'katcp_start = katcp_start:cli',
-            'katportal_start = katportal_start:main',
+            'katportal_start = katportal_start:cli',
             ]
         },
     )
