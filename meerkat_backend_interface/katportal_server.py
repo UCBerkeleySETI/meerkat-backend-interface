@@ -76,19 +76,6 @@ class BLKATPortalClient(object):
         return MSG_TO_FUNCTION_DICT.get(msg_type, self._other)
 
     def start(self):
-        #try:
-        #    ant_sensors, cbf_conf_sensors, cont_update_sensors, conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
-        #    if(ant_sensors is not None):
-        #        self.ant_sensors.extend(ant_sensors)
-        #    if(cbf_conf_sensors is not None):
-        #        self.cbf_conf_sensors.extend(cbf_conf_sensors)
-       #     if(cont_update_sensors is not None):
-     #           self.cont_update_sensors.extend(cont_update_sensors)
-   #         if(conf_sensors is not None):
-   #             self.conf_sensors.extend(conf_sensors)
-   #         logger.info('Configuration updated')
-   #     except:
-   #         logger.warning('Configuration not updated; old configuration might be present.')
         self.p.subscribe(REDIS_CHANNELS.alerts)
         self._print_start_image()
         for message in self.p.listen():
@@ -225,12 +212,16 @@ class BLKATPortalClient(object):
         try:
             ant_sensors, cbf_conf_sensors, cont_update_sensors, conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
             if(ant_sensors is not None):
+                self.ant_sensors = []
                 self.ant_sensors.extend(ant_sensors)
             if(cbf_conf_sensors is not None):
+                self.cbf_conf_sensors = []
                 self.cbf_conf_sensors.extend(cbf_conf_sensors)
             if(cont_update_sensors is not None):
+                self.cont_update_sensors = []
                 self.cont_update_sensors.extend(cont_update_sensors)
             if(conf_sensors is not None):
+                self.conf_sensors = []
                 self.conf_sensors.extend(conf_sensors)
             logger.info('Configuration updated')
         except:
@@ -241,19 +232,19 @@ class BLKATPortalClient(object):
         self.subarray_katportals[product_id] = client
         logger.info("Created katportalclient object for : {}".format(product_id))
         if(len(self.conf_sensors) > 0):
-            self.conf_sensors = ['subarray_{}_'.format(product_id[-1]) + sensor for sensor in self.conf_sensors]
-            logger.info(self.conf_sensors)
+            conf_sensor_names = ['subarray_{}_'.format(product_id[-1]) + sensor for sensor in self.conf_sensors]
+            logger.info(conf_sensor_names)
             sensors_and_values = self.io_loop.run_sync(
-                lambda: self._get_sensor_values(product_id, self.conf_sensors))
+                lambda: self._get_sensor_values(product_id, conf_sensor_names))
             for sensor_name, details in sensors_and_values.items():
                 key = "{}:{}".format(product_id, sensor_name)
                 write_pair_redis(self.redis_server, key, details['value'])
         if(len(self.cbf_conf_sensors) > 0):
             #Complete the CBF sensor names with product ID number
-            self.cbf_conf_sensors = ['cbf_{}_'.format(product_id[-1]) + sensor for sensor in self.cbf_conf_sensors]
-            logger.info(self.conf_sensors)   
+            cbf_conf_sensor_names = ['cbf_{}_'.format(product_id[-1]) + sensor for sensor in self.cbf_conf_sensors]
+            logger.info(cbf_conf_sensor_names)   
             sensors_and_values = self.io_loop.run_sync(
-                lambda: self._get_sensor_values(product_id, self.cbf_conf_sensors))
+                lambda: self._get_sensor_values(product_id, cbf_conf_sensor_names))
             for sensor_name, details in sensors_and_values.items():
                 key = "{}:{}".format(product_id, sensor_name)
                 write_pair_redis(self.redis_server, key, repr(details['value']))

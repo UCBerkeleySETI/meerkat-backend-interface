@@ -160,10 +160,10 @@ def main(port, cfg_file):
                 n_freq_channels = red.get('{}:n_channels'.format(product_id))
                 red.publish(HPGDOMAIN + ':///set', 'FENCHAN=' + n_freq_channels)
                 # Number of channels per substream
-                n_chans_per_substream = red.get('{}:cbf_{}_i0_antenna_channelised_voltage_n_chans_per_substream'.format(product_id, product_id[-1]))
+                n_chans_per_substream = red.get('{}:cbf_{}_wide_antenna_channelised_voltage_n_chans_per_substream'.format(product_id, product_id[-1]))
                 red.publish(HPGDOMAIN + ':///set', 'HNCHAN=' + n_chans_per_substream)
                 # Number of spectra per heap
-                spectra_per_heap = red.get('{}:cbf_{}_i0_tied_array_channelised_voltage_0x_spectra_per_heap'.format(product_id, product_id[-1]))
+                spectra_per_heap = red.get('{}:cbf_{}_wide_tied_array_channelised_voltage_0x_spectra_per_heap'.format(product_id, product_id[-1]))
                 red.publish(HPGDOMAIN + ':///set', 'HNTIME=' + spectra_per_heap)
                 # Number of ADC samples per heap
                 adc_per_spectra = red.get('{}:cbf_{}_wide_antenna_channelised_voltage_n_samples_between_spectra'.format(product_id, product_id[-1]))
