@@ -234,7 +234,7 @@ class BLKATPortalClient(object):
                 lambda: self._get_sensor_values(product_id, self.conf_sensors))
             for sensor_name, details in sensors_and_values.items():
                 key = "{}:{}".format(product_id, sensor_name)
-                write_pair_redis(self.redis_server, key, repr(details['value']))
+                write_pair_redis(self.redis_server, key, details['value'])
         if(len(self.cbf_conf_sensors) > 0):
             #Complete the CBF sensor names with product ID number
             self.cbf_conf_sensors = ['cbf_{}_'.format(product_id[-1]) + sensor for sensor in self.cbf_conf_sensors]
