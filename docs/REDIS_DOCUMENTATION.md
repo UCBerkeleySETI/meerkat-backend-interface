@@ -67,7 +67,7 @@ Most of the keys published to redis will look like this, and are created from th
 | Message                             | Description                                                                                      | Channel         | Publisher(s)       | Subscriber(s)                      |
 |:------------------------------------|:---------------------------------------------------------------------------------------------------|:----------------|:-------------------|:-----------------------------------|
 | `configure:[product_id]`            | Published when a configure request is received, indicating that a subarray has been built.         | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
-| `conf_complete:[product_id]`        | Published once all sensor values required at subarray configuration time have been acquired        | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
+| `conf_complete:[product_id]`        | Published once all sensor values required at subarray configuration time have been acquired        | `alerts`        | `katportal_server` | `katportal_server`, `coordinator`  |
 | `capture-init:[product_id]`         | Published when a capture-init request is received, indicating that a program block is starting.    | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
 | `capture-start:[product_id]`        | Published when a capture-start request is received, indicating the start of an observation.        | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
 | `capture-stop:[product_id]`         | Published when a capture-stop request is received, indicating the end of an observation.           | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
@@ -83,7 +83,6 @@ SPEAD stream addresses are published along with other information to individual 
 | Message                           | Description                                                                                      | Channel                                 |
 |:----------------------------------|:-------------------------------------------------------------------------------------------------|:----------------------------------------|
 | `NCHAN=[num channels]`            | To Be Deleted                                                                                    | `[HPGDOMAIN]://[hashpipe_instance]/set` |
-|                                   | test                                                                                                 |                                         |
 | `NSTRM=[num streams]`             | Number of streams apportioned to each processing instance.                                       | `[HPGDOMAIN]://[hashpipe_instance]/set` | 
 | `DESTIP=[SPEAD addresses]`        | IP addresses for SPEAD streams.                                                                  | `[HPGDOMAIN]://[hashpipe_instance]/set` |
 | `SCHAN=[first starting channel]`  | Absolute starting channel number for a particular instance.                                      | `[HPGDOMAIN]://[hashpipe_instance]/set` |
