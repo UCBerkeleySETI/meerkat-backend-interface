@@ -60,39 +60,45 @@ Most of the keys published to redis will look like this, and are created from th
 ```
 
 # Messages
-*Here are the messages published to the various channels of the redis server*
 
-## Channel: `alerts`
+## Internal Channels: `alerts` and `sensor_alerts`
 
-* `configure:[product_id]` --> sent when a configure request is sent to the `KATCP Server`. Gives the associated product_id. 
-* `capture-init:[product_id]` --> sent when a capture-init request is sent to the `KATCP Server`. Gives the associated product_id. Signifies that a program block is starting. This is not yet the start of an observation schedule block, so no need to start data capture yet.
-* `capture-start:[product_id]` --> sent when a capture-start request is sent to the `KATCP Server`. Gives the associated product_id. Signals the start of an observation. Should be used to trigger other modules to start ingesting and processing data.
-* `capture-stop:[product_id]` --> sent when a capture-stop request is sent to the `KATCP Server`. Gives the associated product_id. Signals the end of an observation. Should be used to trigger other modules to stop ingesting data.
-* `capture-done:[product_id]` --> sent when a capture-done request is sent to the `KATCP Server`. Gives the associated product_id. Signals that the current program block is done.
-* `deconfigure:[product_id]` --> sent when a deconfigure request is sent to the `KATCP Server`. Gives the associated product_id
-* `conf_complete:[product_id]` --> sent when all the sensor data associated with the `configure` stage of an observation have been collected and stored.
 
-## Channel: `sensor_alerts`
+| Message                             | Description                                                                                      | Channel         | Publisher(s)       | Subscriber(s)                      |
+|:------------------------------------|:---------------------------------------------------------------------------------------------------|:----------------|:-------------------|:-----------------------------------|
+| `configure:[product_id]`            | Published when a configure request is received, indicating that a subarray has been built.         | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
+| `conf_complete:[product_id]`        | Published once all sensor values required at subarray configuration time have been acquired        | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
+| `capture-init:[product_id]`         | Published when a capture-init request is received, indicating that a program block is starting.    | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
+| `capture-start:[product_id]`        | Published when a capture-start request is received, indicating the start of an observation.        | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
+| `capture-stop:[product_id]`         | Published when a capture-stop request is received, indicating the end of an observation.           | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
+| `capture-done:[product_id]`         | Published when a capture-done request is received, indicating the end of a program block.          | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
+| `deconfigure:[product_id]`          | Published when a deconfigure request is received, indicating that a subarray has been broken down. | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
+| `[product_id]:data_suspect:[value]` | Value of `data-suspect` for the full subarray (`False` if all antennas report `False`.             | `sensor_alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
+| `[product_id]:target:[value]`       | Current target under observation.                                                                  | `sensor_alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
 
-* `[sensor_name]:[sensor_val]` --> Sent when a sensor (which belongs to the list of sensors for subscription in the `KATPortal Client`) reports a new value.
-* `[product_id]:data_suspect:[value]` --> Value of data-suspect for the full subarray (only `False` if all the antennas in the subarray indicate `False`.
+## Hashpipe-Redis Gateway
 
-## Channel: `[HPGDOMAIN]://[hashpipe_instance]/set`
-SPEAD stream addresses are published along with other information to individual channels, one each per processing instance. 
-An example of a channel: `bluse://blpn48/0/set`. The messages published to this channel are formatted for use with the hashpipe-redis gateway.
+SPEAD stream addresses are published along with other information to individual channels, one each per processing instance. An example of a channel: `bluse://blpn48/0/set`. The messages published to this channel are formatted for use with the hashpipe-redis gateway. Messages published to the channel `[HPGDOMAIN]:///set ` are received by all processing instances.
 
-* `DESTIP=[SPEAD addresses]` --> IP addresses for SPEAD streams. 
-* `NSTRM=[num streams]` --> Number of streams apportioned to each processing instance.
-* `NCHAN=[num channels]` --> Total number of channels to be processed by a particular processing instance. 
+| Message                           | Description                                                                                      | Channel                                 |
+|:----------------------------------|:-------------------------------------------------------------------------------------------------|:----------------------------------------|
+| `NCHAN=[num channels]`            | To Be Deleted                                                                                    | `[HPGDOMAIN]://[hashpipe_instance]/set` |
+|                                   | test                                                                                                 |                                         |
+| `NSTRM=[num streams]`             | Number of streams apportioned to each processing instance.                                       | `[HPGDOMAIN]://[hashpipe_instance]/set` | 
+| `DESTIP=[SPEAD addresses]`        | IP addresses for SPEAD streams.                                                                  | `[HPGDOMAIN]://[hashpipe_instance]/set` |
+| `SCHAN=[first starting channel]`  | Absolute starting channel number for a particular instance.                                      | `[HPGDOMAIN]://[hashpipe_instance]/set` |
+| `DESTIP=[port]`                   | Port number for SPEAD streams.                                                                   | `[HPGDOMAIN]:///set`                    |
+| `DESTIP=0.0.0.0`                  | Message to unsubscribe to streams (sent on deconfigure).                                         | `[HPGDOMAIN]:///set`                    |  
+| `NETSTAT=RECORD`                  | Message to start recording data, sent when`capture-start` is published to the `alerts` channel.  | `[HPGDOMAIN]:///set`                    |
+| `NETSTAT=LISTEN`                  | Message to stop recording data, sent when `capture-stop` is published to the `alerts` channel.   | `[HPGDOMAIN]:///set`                    |
+| `FENCHAN=[num channels]`          | Total number of channels received on configure.                                                  | `[HPGDOMAIN]:///set`                    |
+| `FENSTRM=[num streams]`           | Total number of streams received on configure.                                                   | `[HPGDOMAIN]:///set`                    |
+| `HNCHAN=[channels per substream]` | Number of channels per substream.                                                                | `[HPGDOMAIN]:///set`                    |
+| `HNTIME=[spectra per heap]`       | Number of spectra per heap.                                                                      | `[HPGDOMAIN]:///set`                    |
+| `SYNCTIME=[sync time]`            | UNIX sync time, obtained when `configure` is published to the `alerts` channel.                  | `[HPGDOMAIN]:///set`                    |
+| `HCLOCKS=[ADC samples per heap]`  | Number of ADC samples per heap.                                                                  | `[HPGDOMAIN]:///set`                    |
+| `NANTS=[num antennas]`            | Number of antennas in the subarray.                                                              | `[HPGDOMAIN]:///set`                    |
 
-## Channel: `[HPGDOMAIN]:///set`
-Messages published to this channel are received by all processing instances.
 
-* `BINDPORT=[port]` --> Port number for SPEAD streams.
-* `DESTIP=0.0.0.0` --> Message to unsubscribe to streams (sent on deconfigure).
-* `NETSTAT=RECORD` --> Message to start recording data, sent when`capture-start` is published to the `alerts` channel.
-* `NETSTAT=LISTEN` --> Message to stop recording data, sent when `capture-stop` is published to the `alerts` channel.
-* `FENCHAN=[num channels]` --> Total number of channels received on configure. 
-* `FENSTRM=[num streams]` --> Total number of streams received on configure. 
-* `HNCHAN=[channels per substream]` --> Number of channels per substream.
-* `HNTIME=[spectra per heap]` --> Number of spectra per heap. 
+
+
