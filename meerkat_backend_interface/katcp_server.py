@@ -206,6 +206,13 @@ ___,-| |----''    / |         `._`-.          `----
         except Exception as e:
             log.error(e)
             return ("fail", e)
+        # Extracting CBF prefix from configure message as recommended by CAM
+        try:
+            stream_type = 'cbf.antenna_channelised_voltage'
+            cbf_prefix = json_dict[stream_type].keys()[0].split('.')[0]
+        except Exception as e:
+            cbf_prefix = 'wide'
+            log.error('Could not extract CBF prefix; defaulting to \'wide\'')
         statuses = []
         statuses.append(write_pair_redis(self.redis_server, "{}:timestamp".format(product_id), time.time()))
         statuses.append(write_list_redis(self.redis_server, "{}:antennas".format(product_id), antennas_list))
@@ -214,6 +221,7 @@ ___,-| |----''    / |         `._`-.          `----
         statuses.append(write_pair_redis(self.redis_server, "{}:streams".format(product_id), json.dumps(json_dict)))
         statuses.append(write_pair_redis(self.redis_server, "{}:cam:url".format(product_id), cam_url))
         statuses.append(write_pair_redis(self.redis_server, "current:obs:id", product_id))
+        statuses.append(write_pair_redis(self.redis_server, "{}:cbf_prefix".format(product_id), cbf_prefix))
         msg = "configure:{}".format(product_id)
         statuses.append(publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg))
         if all(statuses):

@@ -13,7 +13,6 @@ from meerkat_backend_interface.logger import log
 CHANNEL     = redis_tools.REDIS_CHANNELS.alerts  # Redis channel to listen on
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'  # Type of stream to distribute
 HPGDOMAIN   = 'bluse'
-CAM_PREFIX  = 'wide' # To Do: Automatically infer prefix from configure message. 
 
 def json_str_formatter(str_dict):
     """Formatting for json.loads
@@ -124,9 +123,10 @@ def pub_gateway_msg(red_server, chan_name, msg_name, msg_val, logger):
     red_server.publish(chan_name, msg)
     logger.info('Published {} to channel {}'.format(msg, chan_name))
 
-def cbf_sensor_name(product_id, CAM_PREFIX, sensor):
+def cbf_sensor_name(product_id, redis_server, sensor):
     subarray_nr = product_id[-1] # product ID ends in subarray number
-    cbf_sensor_prefix = '{}:cbf_{}_{}_'.format(product_id, subarray_nr, CAM_PREFIX)
+    cbf_prefix = redis_server.get('{}:cbf_prefix'.format(product_id))
+    cbf_sensor_prefix = '{}:cbf_{}_{}_'.format(product_id, subarray_nr, cbf_prefix)
     return cbf_sensor_prefix + sensor
 
 def main(port, cfg_file):
@@ -163,8 +163,8 @@ def main(port, cfg_file):
                 n_ants = len(red.lrange(ant_key, 0, red.llen(ant_key)))
                 pub_gateway_msg(red, global_chan, 'NANTS', n_ants, log)
                 # Sync time (UNIX, seconds)
-                sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'sync_time')   
-                sync_time =  int(float(red.get(sensor_key))) # Is there a cleaner way to achieve this casting?
+                sensor_key = cbf_sensor_name(product_id, red, 'sync_time')   
+                sync_time = int(float(red.get(sensor_key))) # Is there a cleaner way to achieve this casting?
                 pub_gateway_msg(red, global_chan, 'SYNCTIME', sync_time, log)
                 # Port
                 pub_gateway_msg(red, global_chan, 'BINDPORT', port, log)
@@ -174,15 +174,15 @@ def main(port, cfg_file):
                 n_freq_chans = red.get('{}:n_channels'.format(product_id))
                 pub_gateway_msg(red, global_chan, 'FENCHAN', n_freq_chans, log)
                 # Number of channels per substream
-                sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'antenna_channelised_voltage_n_chans_per_substream')   
+                sensor_key = cbf_sensor_name(product_id, red, 'antenna_channelised_voltage_n_chans_per_substream')   
                 n_chans_per_substream = red.get(sensor_key)
                 pub_gateway_msg(red, global_chan, 'HNCHAN', n_chans_per_substream, log)
                 # Number of spectra per heap
-                sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'tied_array_channelised_voltage_0x_spectra_per_heap')   
+                sensor_key = cbf_sensor_name(product_id, red, 'tied_array_channelised_voltage_0x_spectra_per_heap')   
                 spectra_per_heap = red.get(sensor_key)
                 pub_gateway_msg(red, global_chan, 'HNTIME', spectra_per_heap, log)
                 # Number of ADC samples per heap
-                sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'antenna_channelised_voltage_n_samples_between_spectra')   
+                sensor_key = cbf_sensor_name(product_id, red, 'antenna_channelised_voltage_n_samples_between_spectra')   
                 adc_per_spectra = red.get(sensor_key)
                 adc_per_heap = int(adc_per_spectra)*int(spectra_per_heap)
                 pub_gateway_msg(red, global_chan, 'HCLOCKS', adc_per_heap, log)

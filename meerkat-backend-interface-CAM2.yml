@@ -29,10 +29,10 @@ sensors_on_configure:
 - pool_resources
 
 cbf_sensors_on_configure:
-- wide_antenna_channelised_voltage_n_chans_per_substream
-- wide_tied_array_channelised_voltage_0x_spectra_per_heap
-- wide_sync_time
-- wide_antenna_channelised_voltage_n_samples_between_spectra
+- antenna_channelised_voltage_n_chans_per_substream
+- tied_array_channelised_voltage_0x_spectra_per_heap
+- sync_time
+- antenna_channelised_voltage_n_samples_between_spectra
 
 sensors_cont_update:
 

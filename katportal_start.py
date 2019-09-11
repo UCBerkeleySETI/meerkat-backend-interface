@@ -29,6 +29,5 @@ def main(config):
     signal.signal(signal.SIGINT, lambda sig, frame: on_shutdown())
     client.start()
 
-
 if __name__ == '__main__':
     cli()
