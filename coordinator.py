@@ -151,6 +151,7 @@ def main(port, cfg_file):
             msg_type = msg_parts[0]
             product_id = msg_parts[1]
             if msg_type == 'conf_complete':
+                log.info('New subarray built: {}'.format(product_id))
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
                 addr_list, port, n_addrs = read_spead_addresses(streams.values()[0], len(hashpipe_instances), streams_per_instance)
@@ -160,71 +161,47 @@ def main(port, cfg_file):
                 # Number of antennas
                 ant_key = '{}:antennas'.format(product_id)
                 n_ants = len(red.lrange(ant_key, 0, red.llen(ant_key)))
-                    #red.publish(global_channel, 'NANTS=' + str(n_ants))
                 pub_gateway_msg(red, global_chan, 'NANTS', n_ants, log)
                 # Sync time (UNIX, seconds)
-                  #sync_key = '{}:cbf_{}_{}_sync_time'.format(product_id, product_id[-1], CAM_PREFIX) 
                 sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'sync_time')   
-                sync_time =  red.get(sensor_key)
-                  #red.publish(global_channel, 'SYNCTIME=' + str(sync_time))
-                pub_gateway_msg(red, global_chan, 'SYNCTIME', synctime, log)
+                sync_time =  int(float(red.get(sensor_key))) # Is there a cleaner way to achieve this casting?
+                pub_gateway_msg(red, global_chan, 'SYNCTIME', sync_time, log)
                 # Port
-                  #red.publish(HPGDOMAIN + ':///set', 'BINDPORT=' + port)
                 pub_gateway_msg(red, global_chan, 'BINDPORT', port, log)
                 # Total number of streams
-                    #red.publish(HPGDOMAIN + ':///set', 'FENSTRM=' + str(n_addrs))
                 pub_gateway_msg(red, global_chan, 'FENSTRM',n_addrs, log)
                 # Total number of frequency channels    
                 n_freq_chans = red.get('{}:n_channels'.format(product_id))
-                    #red.publish(HPGDOMAIN + ':///set', 'FENCHAN=' + n_freq_channels)
                 pub_gateway_msg(red, global_chan, 'FENCHAN', n_freq_chans, log)
                 # Number of channels per substream
-                    #n_chans_per_substream = red.get('{}:cbf_{}_{}_antenna_channelised_voltage_n_chans_per_substream'.format(product_id, product_id[-1]), CAM_PREFIX)
                 sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'antenna_channelised_voltage_n_chans_per_substream')   
                 n_chans_per_substream = red.get(sensor_key)
-                    #red.publish(HPGDOMAIN + ':///set', 'HNCHAN=' + n_chans_per_substream)
                 pub_gateway_msg(red, global_chan, 'HNCHAN', n_chans_per_substream, log)
                 # Number of spectra per heap
                 sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'tied_array_channelised_voltage_0x_spectra_per_heap')   
                 spectra_per_heap = red.get(sensor_key)
-   #spectra_per_heap = red.get('{}:cbf_{}_{}_tied_array_channelised_voltage_0x_spectra_per_heap'.format(product_id, product_id[-1]), CAM_PREFIX)
-                    #red.publish(HPGDOMAIN + ':///set', 'HNTIME=' + spectra_per_heap)
                 pub_gateway_msg(red, global_chan, 'HNTIME', spectra_per_heap, log)
                 # Number of ADC samples per heap
                 sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'antenna_channelised_voltage_n_samples_between_spectra')   
                 adc_per_spectra = red.get(sensor_key)
-                    #adc_per_spectra = red.get('{}:cbf_{}_{}_antenna_channelised_voltage_n_samples_between_spectra'.format(product_id, product_id[-1]), CAM_PREFIX)
                 adc_per_heap = int(adc_per_spectra)*int(spectra_per_heap)
-                    #red.publish(HPGDOMAIN + ':///set', 'HCLOCKS=' + str(adc_per_heap))
                 pub_gateway_msg(red, global_chan, 'HCLOCKS', adc_per_heap, log)
-
                 for i in range(n_red_chans):
                     local_chan = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
                     # Destination IP addresses for instance i
-                       #msg = 'DESTIP={}'.format(addr_list[i])
-                       #red.publish(red_channel, msg)
                     pub_gateway_msg(red, local_chan, 'DESTIP', addr_list[i], log)
                     # Number of streams for instance i
                     n_streams_per_instance = int(addr_list[i][-1])+1
-                       #msg = 'NSTRM={}'.format(n_streams_per_instance)
-                       #red.publish(red_channel, msg)
                     pub_gateway_msg(red, local_chan, 'NSTRM', n_streams_per_instance, log)
                     # Absolute starting channel for instance i
                     s_chan = i*n_streams_per_instance*int(n_chans_per_substream)
-                       #red.publish(red_channel, 'SCHAN=' + str(s_chan))
                     pub_gateway_msg(red, local_chan, 'SCHAN', s_chan, log)
-                          
             if msg_type == 'deconfigure':
-                  #red_channel = HPGDOMAIN + ':///set'
-                  #red.publish(red_channel, 'DESTIP=0.0.0.0')
                 pub_gateway_msg(red, global_chan, 'DESTIP', '0.0.0.0', log)
+                log.info('Subarray deconfigured')
             if msg_type == 'capture-start':
-                  #red_channel = HPGDOMAIN + ':///set'
-                  #red.publish(red_channel, 'NETSTAT=RECORD')
                 pub_gateway_msg(red, global_chan, 'NETSTAT', 'RECORD', log)
             if msg_type == 'capture-stop':
-                   #red_channel = HPGDOMAIN + ':///set'
-                   #red.publish(red_channel, 'NETSTAT=LISTEN')
                 pub_gateway_msg(red, global_chan, 'NETSTAT', 'LISTEN', log)
     except KeyboardInterrupt:
         log.info("Stopping coordinator")
