@@ -124,6 +124,11 @@ def pub_gateway_msg(red_server, chan_name, msg_name, msg_val, logger):
     red_server.publish(chan_name, msg)
     logger.info('Published {} to channel {}'.format(msg, chan_name))
 
+def cbf_sensor_name(product_id, CAM_PREFIX, sensor):
+    subarray_nr = product_id[-1] # product ID ends in subarray number
+    cbf_sensor_prefix = '{}:cbf_{}_{}_'.format(product_id, subarray_nr, CAM_PREFIX)
+    return cbf_sensor_prefix + sensor
+
 def main(port, cfg_file):
     FORMAT = "[ %(levelname)s - %(asctime)s - %(filename)s:%(lineno)s] %(message)s"
     logging.basicConfig(format=FORMAT)
@@ -158,8 +163,9 @@ def main(port, cfg_file):
                     #red.publish(global_channel, 'NANTS=' + str(n_ants))
                 pub_gateway_msg(red, global_chan, 'NANTS', n_ants, log)
                 # Sync time (UNIX, seconds)
-                sync_key = '{}:cbf_{}_{}_sync_time'.format(product_id, product_id[-1], CAM_PREFIX)
-                sync_time =  red.get(sync_key)
+                  #sync_key = '{}:cbf_{}_{}_sync_time'.format(product_id, product_id[-1], CAM_PREFIX) 
+                sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'sync_time')   
+                sync_time =  red.get(sensor_key)
                   #red.publish(global_channel, 'SYNCTIME=' + str(sync_time))
                 pub_gateway_msg(red, global_chan, 'SYNCTIME', synctime, log)
                 # Port
@@ -173,15 +179,21 @@ def main(port, cfg_file):
                     #red.publish(HPGDOMAIN + ':///set', 'FENCHAN=' + n_freq_channels)
                 pub_gateway_msg(red, global_chan, 'FENCHAN', n_freq_chans, log)
                 # Number of channels per substream
-                n_chans_per_substream = red.get('{}:cbf_{}_{}_antenna_channelised_voltage_n_chans_per_substream'.format(product_id, product_id[-1]), CAM_PREFIX)
+                    #n_chans_per_substream = red.get('{}:cbf_{}_{}_antenna_channelised_voltage_n_chans_per_substream'.format(product_id, product_id[-1]), CAM_PREFIX)
+                sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'antenna_channelised_voltage_n_chans_per_substream')   
+                n_chans_per_substream = red.get(sensor_key)
                     #red.publish(HPGDOMAIN + ':///set', 'HNCHAN=' + n_chans_per_substream)
                 pub_gateway_msg(red, global_chan, 'HNCHAN', n_chans_per_substream, log)
                 # Number of spectra per heap
-                spectra_per_heap = red.get('{}:cbf_{}_{}_tied_array_channelised_voltage_0x_spectra_per_heap'.format(product_id, product_id[-1]), CAM_PREFIX)
+                sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'tied_array_channelised_voltage_0x_spectra_per_heap')   
+                spectra_per_heap = red.get(sensor_key)
+   #spectra_per_heap = red.get('{}:cbf_{}_{}_tied_array_channelised_voltage_0x_spectra_per_heap'.format(product_id, product_id[-1]), CAM_PREFIX)
                     #red.publish(HPGDOMAIN + ':///set', 'HNTIME=' + spectra_per_heap)
                 pub_gateway_msg(red, global_chan, 'HNTIME', spectra_per_heap, log)
                 # Number of ADC samples per heap
-                adc_per_spectra = red.get('{}:cbf_{}_{}_antenna_channelised_voltage_n_samples_between_spectra'.format(product_id, product_id[-1]), CAM_PREFIX)
+                sensor_key = cbf_sensor_name(product_id, CAM_PREFIX, 'antenna_channelised_voltage_n_samples_between_spectra')   
+                adc_per_spectra = red.get(sensor_key)
+                    #adc_per_spectra = red.get('{}:cbf_{}_{}_antenna_channelised_voltage_n_samples_between_spectra'.format(product_id, product_id[-1]), CAM_PREFIX)
                 adc_per_heap = int(adc_per_spectra)*int(spectra_per_heap)
                     #red.publish(HPGDOMAIN + ':///set', 'HCLOCKS=' + str(adc_per_heap))
                 pub_gateway_msg(red, global_chan, 'HCLOCKS', adc_per_heap, log)
