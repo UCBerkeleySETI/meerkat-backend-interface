@@ -22,6 +22,7 @@ hashpipe_instances:
 - blpn63/0
 
 sensors_per_antenna:
+- marked_faulty
 - data_suspect           
 - target
 

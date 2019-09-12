@@ -110,6 +110,8 @@ class BLKATPortalClient(object):
                 # subarray data-suspect
                 if('data_suspect' in sensor_name):
                     self.subarray_data_suspect(product_id)
+                if('marked_faulty' in sensor_name):
+                    self.subarray_data_suspect(product_id)
                 # subarray target
                 if('target' in sensor_name):
                     self.subarray_consensus(product_id, 'target')
