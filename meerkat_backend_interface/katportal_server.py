@@ -252,7 +252,6 @@ class BLKATPortalClient(object):
             #Complete the CBF sensor names with product ID number
             cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
             cbf_sensor_prefix = 'cbf_{}_{}_'.format(product_id[-1], cbf_prefix)
-            #cbf_conf_sensor_names = ['cbf_{}_'.format(product_id[-1]) + sensor for sensor in self.cbf_conf_sensors]
             cbf_conf_sensor_names = [cbf_sensor_prefix + sensor for sensor in self.cbf_conf_sensors]
             sensors_and_values = self.io_loop.run_sync(
                 lambda: self._get_sensor_values(product_id, cbf_conf_sensor_names))
@@ -425,21 +424,21 @@ class BLKATPortalClient(object):
         else:
             for sensor_name in sensor_names:
                 try:
-                    sensor_value = yield client.sensor_value(sensor_name, include_value_ts=True)
-                    sensors_and_values[sensor_name] = self._convert_SensorSampleValueTs_to_dict(sensor_value)
+                    sensor_value = yield client.sensor_value(sensor_name, include_value_time=True)
+                    sensors_and_values[sensor_name] = self._convert_SensorSampleValueTime_to_dict(sensor_value)
                 except SensorNotFoundError as exc:
                     print("\n", exc)
                     continue
             # TODO: get more information using the client?
         raise tornado.gen.Return(sensors_and_values)
 
-    def _convert_SensorSampleValueTs_to_dict(self, sensor_value):
+    def _convert_SensorSampleValueTime_to_dict(self, sensor_value):
         """Converts the named-tuple object returned by sensor_value
             query into a dictionary. This dictionary contains the following values:
-                - timestamp:  float
+                - sample_time:  float
                     The timestamp (UNIX epoch) the sample was received by CAM.
                     Timestamp value is reported with millisecond precision.
-                - value_timestamp:  float
+                - value_time:  float
                     The timestamp (UNIX epoch) the sample was read at the lowest level sensor.
                     value_timestamp value is reported with millisecond precision.
                 - value:  str
@@ -451,14 +450,14 @@ class BLKATPortalClient(object):
                     'critical', 'unreachable', 'unknown', etc.
 
             Args:
-                sensor_value (SensorSampleValueTs)
+                sensor_value (SensorSampleValueTime)
 
             Returns:
                 (dict)
         """
         sensor_value_dict = dict()
-        sensor_value_dict['timestamp'] = sensor_value.timestamp
-        sensor_value_dict['value_timestamp'] = sensor_value.value_timestamp
+        sensor_value_dict['sample_time'] = sensor_value.timestamp
+        sensor_value_dict['value_time'] = sensor_value.value_timestamp
         sensor_value_dict['value'] = sensor_value.value
         sensor_value_dict['status'] = sensor_value.status
         return sensor_value_dict
