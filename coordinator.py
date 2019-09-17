@@ -150,14 +150,14 @@ def main(port, cfg_file):
                 continue
             msg_type = msg_parts[0]
             product_id = msg_parts[1]
+            # Channel
+            global_chan = HPGDOMAIN + ':///set'
             if msg_type == 'conf_complete':
                 log.info('New subarray built: {}'.format(product_id))
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
                 addr_list, port, n_addrs = read_spead_addresses(streams.values()[0], len(hashpipe_instances), streams_per_instance)
                 n_red_chans = len(addr_list)
-                # Channel
-                global_chan = HPGDOMAIN + ':///set'
                 # Number of antennas
                 ant_key = '{}:antennas'.format(product_id)
                 n_ants = len(red.lrange(ant_key, 0, red.llen(ant_key)))

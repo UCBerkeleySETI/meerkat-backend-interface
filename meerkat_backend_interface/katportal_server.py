@@ -424,7 +424,7 @@ class BLKATPortalClient(object):
         else:
             for sensor_name in sensor_names:
                 try:
-                    sensor_value = yield client.sensor_value(sensor_name, include_value_time=True)
+                    sensor_value = yield client.sensor_value(sensor_name, include_value_ts=True)
                     sensors_and_values[sensor_name] = self._convert_SensorSampleValueTime_to_dict(sensor_value)
                 except SensorNotFoundError as exc:
                     print("\n", exc)
@@ -456,8 +456,8 @@ class BLKATPortalClient(object):
                 (dict)
         """
         sensor_value_dict = dict()
-        sensor_value_dict['sample_time'] = sensor_value.timestamp
-        sensor_value_dict['value_time'] = sensor_value.value_timestamp
+        sensor_value_dict['timestamp'] = sensor_value.sample_time
+        sensor_value_dict['value_timestamp'] = sensor_value.value_time
         sensor_value_dict['value'] = sensor_value.value
         sensor_value_dict['status'] = sensor_value.status
         return sensor_value_dict
