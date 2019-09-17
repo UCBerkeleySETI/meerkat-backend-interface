@@ -8,7 +8,7 @@ import sys
 import redis
 import numpy as np
 from meerkat_backend_interface import redis_tools
-from meerkat_backend_interface.logger import log
+from meerkat_backend_interface.logger import log, set_logger
 
 CHANNEL     = redis_tools.REDIS_CHANNELS.alerts  # Redis channel to listen on
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'  # Type of stream to distribute
@@ -130,9 +130,7 @@ def cbf_sensor_name(product_id, redis_server, sensor):
     return cbf_sensor_prefix + sensor
 
 def main(port, cfg_file):
-    FORMAT = "[ %(levelname)s - %(asctime)s - %(filename)s:%(lineno)s] %(message)s"
-    logging.basicConfig(format=FORMAT)
-    log.setLevel(logging.DEBUG)
+    log = set_logger(log_level = logging.DEBUG)
     log.info("Starting Coordinator")
     try:
         hashpipe_instances, streams_per_instance = configure(cfg_file)

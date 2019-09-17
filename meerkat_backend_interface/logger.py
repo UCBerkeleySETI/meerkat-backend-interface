@@ -11,7 +11,7 @@ log = get_logger()
 
 def set_logger(log_level=logging.DEBUG):
     """Set up logging."""
-    FORMAT = "[ %(levelname)s - %(asctime)s - %(filename)s:%(lineno)s] %(message)s"
+    FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)s"
     logging.basicConfig(format=FORMAT)
     log = get_logger()
     log.setLevel(log_level)
