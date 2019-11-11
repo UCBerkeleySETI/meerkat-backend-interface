@@ -121,6 +121,8 @@ def configure(cfg_file):
 def pub_gateway_msg(red_server, chan_name, msg_name, msg_val, logger):
     msg = '{}={}'.format(msg_name, msg_val)
     red_server.publish(chan_name, msg)
+    # save hash of most recent messages
+    red_server.hset(chan_name, msg_name, msg_val)
     logger.info('Published {} to channel {}'.format(msg, chan_name))
 
 def cbf_sensor_name(product_id, redis_server, sensor):
