@@ -34,6 +34,7 @@ cbf_sensors_on_configure:
 - tied_array_channelised_voltage_0x_spectra_per_heap
 - sync_time
 - antenna_channelised_voltage_n_samples_between_spectra
+- adc_sample_rate
 
 sensors_cont_update:
 

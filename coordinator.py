@@ -167,7 +167,7 @@ def main(port, cfg_file):
                 # Port
                 pub_gateway_msg(red, global_chan, 'BINDPORT', port, log)
                 # Total number of streams
-                pub_gateway_msg(red, global_chan, 'FENSTRM',n_addrs, log)
+                pub_gateway_msg(red, global_chan, 'FENSTRM', n_addrs, log)
                 # Total number of frequency channels    
                 n_freq_chans = red.get('{}:n_channels'.format(product_id))
                 pub_gateway_msg(red, global_chan, 'FENCHAN', n_freq_chans, log)
@@ -184,6 +184,13 @@ def main(port, cfg_file):
                 adc_per_spectra = red.get(sensor_key)
                 adc_per_heap = int(adc_per_spectra)*int(spectra_per_heap)
                 pub_gateway_msg(red, global_chan, 'HCLOCKS', adc_per_heap, log)
+                # Coarse channel bandwidth (from F engines)
+                # Note: no sign information!  
+                sensor_key = cbf_sensor_name(product_id, red, 'adc_sample_rate')
+                adc_sample_rate = red.get(sensor_key)
+                coarse_chan_bw = float(adc_sample_rate)/2.0/int(n_freq_chans)
+                coarse_chan_bw = '{0:.17g}'.format(coarse_chan_bw)
+                pub_gateway_msg(red, global_chan, 'CHAN_BW', coarse_chan_bw, log) 
                 for i in range(n_red_chans):
                     local_chan = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
                     # Destination IP addresses for instance i
