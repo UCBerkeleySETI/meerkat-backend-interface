@@ -13,6 +13,53 @@ from meerkat_backend_interface.logger import log, set_logger
 CHANNEL     = redis_tools.REDIS_CHANNELS.alerts  # Redis channel to listen on
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'  # Type of stream to distribute
 HPGDOMAIN   = 'bluse'
+PKTIDX_MARGIN = 1024 # Safety margin for setting index of first packet to record.
+
+def get_pkt_idx(red_server, host_key):
+    """Get PKTIDX for active hosts.
+    """
+    pkt_idx = None
+    host_status = red_server.hgetall(host_key)
+    if(host_status['NETSTAT'] != 'idle'):
+        pkt_idx = host_status['PKTIDX']
+    return pkt_idx
+
+def select_pkt_start(pkt_idxs, log, idx_margin):
+    """heuristic: if any outliers differ more than 50% of the idx_margin,
+       log a warning. 
+    """
+    pkt_idxs = np.asarray(pkt_idxs, dtype = np.int64)
+    median = np.median(pkt_idxs)
+    margin_diff = np.abs(pkt_idxs - median)
+    # Using idx_margin as safety margin
+    margin = idx_margin
+    outliers = np.where(margin_diff > margin)[0]
+    n_outliers = len(outliers)
+    if(n_outliers > 0):
+        log.warning('{} PKTIDX value(s) exceed margin.'.format(n_outliers))
+    if(n_outliers > len(pkt_idxs)/2):
+        log.warning('Large PKTIDX spread. Check PKTSTART value.')
+    # Find largest value less than margin
+    margin_diff[outliers] = 0
+    max_idx = np.argmax(margin_diff)
+    start_pkt = pkt_idxs[max_idx] + idx_margin
+    return start_pkt
+
+def get_start_idx(red_server, host_list, idx_margin, log):
+    """Calculate the packet index at which recording should begin
+       (synchronously) for all processing nodes.
+    """
+    pkt_idxs = []
+    for host in host_list:
+        host_key = '{}://{}/status'.format(HPGDOMAIN, host)
+        pkt_idx = get_pkt_idx(red_server, host_key)
+        if(pkt_idx is not None):
+            pkt_idxs = pkt_idxs + [pkt_idx]
+    if(len(pkt_idxs) > 0):
+        return select_pkt_start(pkt_idxs, log, idx_margin)
+    else:
+        log.warning('No active processing nodes. Cannot set PKTIDX')   
+        return None
 
 def json_str_formatter(str_dict):
     """Formatting for json.loads
@@ -207,7 +254,8 @@ def main(port, cfg_file):
                 pub_gateway_msg(red, global_chan, 'DESTIP', '0.0.0.0', log)
                 log.info('Subarray deconfigured')
             if msg_type == 'capture-start':
-                pub_gateway_msg(red, global_chan, 'NETSTAT', 'RECORD', log)
+                pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
+                pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log) 
             if msg_type == 'capture-stop':
                 pub_gateway_msg(red, global_chan, 'NETSTAT', 'LISTEN', log)
     except KeyboardInterrupt:
