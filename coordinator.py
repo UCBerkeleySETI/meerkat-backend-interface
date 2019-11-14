@@ -319,7 +319,8 @@ def main(port, cfg_file):
                 # Note: no sign information!  
                 sensor_key = cbf_sensor_name(product_id, red, 'adc_sample_rate')
                 adc_sample_rate = red.get(sensor_key)
-                coarse_chan_bw = float(adc_sample_rate)/2.0/int(n_freq_chans)
+                # Default to negative for now.
+                coarse_chan_bw = -1*float(adc_sample_rate)/2.0/int(n_freq_chans)/10e6
                 coarse_chan_bw = '{0:.17g}'.format(coarse_chan_bw)
                 pub_gateway_msg(red, global_chan, 'CHAN_BW', coarse_chan_bw, log) 
                 for i in range(n_red_chans):
