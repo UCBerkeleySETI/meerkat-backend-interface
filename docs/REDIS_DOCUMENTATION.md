@@ -98,7 +98,6 @@ SPEAD stream addresses are published along with other information to individual 
 | `SCHAN=[first starting channel]`  | Absolute starting channel number for a particular instance.                                      | `[HPGDOMAIN]://[hashpipe_instance]/set` |
 | `DESTIP=[port]`                   | Port number for SPEAD streams.                                                                   | `[HPGDOMAIN]:///set`                    |
 | `DESTIP=0.0.0.0`                  | Message to unsubscribe to streams (sent on deconfigure).                                         | `[HPGDOMAIN]:///set`                    |  
-| `NETSTAT=RECORD`                  | Message to start recording data, sent when`capture-start` is published to the `alerts` channel.  | `[HPGDOMAIN]:///set`                    |
 | `NETSTAT=LISTEN`                  | Message to stop recording data, sent when `capture-stop` is published to the `alerts` channel.   | `[HPGDOMAIN]:///set`                    |
 | `FENCHAN=[num channels]`          | Total number of channels received on configure.                                                  | `[HPGDOMAIN]:///set`                    |
 | `FENSTRM=[num streams]`           | Total number of streams received on configure.                                                   | `[HPGDOMAIN]:///set`                    |
@@ -107,7 +106,7 @@ SPEAD stream addresses are published along with other information to individual 
 | `SYNCTIME=[sync time]`            | UNIX sync time, obtained when `configure` is published to the `alerts` channel.                  | `[HPGDOMAIN]:///set`                    |
 | `HCLOCKS=[ADC samples per heap]`  | Number of ADC samples per heap.                                                                  | `[HPGDOMAIN]:///set`                    |
 | `NANTS=[num antennas]`            | Number of antennas in the subarray.                                                              | `[HPGDOMAIN]:///set`                    |
-
-
+| `CHAN_BW=[channel bandwidth]`     | Bandwidth of a single F-engine frequency channel (coarse channel).                               | `[HPGDOMAIN]:///set`                    |
+| `PKTSTART=[starting packet index]`| Index of the first packet from which to record (to ensure a synchronised start across instances).| `[HPGDOMAIN]:///set`                    |
 
 

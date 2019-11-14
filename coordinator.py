@@ -16,7 +16,16 @@ HPGDOMAIN   = 'bluse'
 PKTIDX_MARGIN = 1024 # Safety margin for setting index of first packet to record.
 
 def get_pkt_idx(red_server, host_key):
-    """Get PKTIDX for active hosts.
+    """Get PKTIDX for a host (if active).
+    
+    Args:
+        red_server: Redis server.
+        host_key (str): Key for Redis hash of status buffer for a 
+        particular active host.
+
+    Returns:
+        pkt_idx (str): Current packet index (PKTIDX) for a particular 
+        active host. Returns None if host is not active.
     """
     pkt_idx = None
     host_status = red_server.hgetall(host_key)
@@ -25,8 +34,21 @@ def get_pkt_idx(red_server, host_key):
     return pkt_idx
 
 def select_pkt_start(pkt_idxs, log, idx_margin):
-    """heuristic: if any outliers differ more than 50% of the idx_margin,
-       log a warning. 
+    """Calculates the index of the first packet from which to record 
+    for each processing node.
+    Employs rudimentary statistics on packet indices to determine
+    a sensible starting packet for all processing nodes.  
+
+    Args:
+        pkt_idxs (list): List of the packet indices from each active host. 
+        log: Logger.
+        idx_margin (int): The safety margin (number of extra packets 
+        before beginning to record) to ensure a synchronous start across
+        processing nodes. 
+
+    Returns:
+        start_pkt (int): The packet index at which to begin recording 
+        data.
     """
     pkt_idxs = np.asarray(pkt_idxs, dtype = np.int64)
     median = np.median(pkt_idxs)
@@ -47,7 +69,20 @@ def select_pkt_start(pkt_idxs, log, idx_margin):
 
 def get_start_idx(red_server, host_list, idx_margin, log):
     """Calculate the packet index at which recording should begin
-       (synchronously) for all processing nodes.
+    (synchronously) for all processing nodes.
+
+        Args:
+            red_server: Redis server.
+            host_list (List): List of host/processing node names (incuding
+            instance number). 
+            idx_margin (int): The safety margin (number of extra packets 
+            before beginning to record) to ensure a synchronous start across
+            processing nodes. 
+            log: Logger.
+
+        Returns:
+            start_pkt (int): The packet index at which to begin recording 
+            data.
     """
     pkt_idxs = []
     for host in host_list:
@@ -56,7 +91,8 @@ def get_start_idx(red_server, host_list, idx_margin, log):
         if(pkt_idx is not None):
             pkt_idxs = pkt_idxs + [pkt_idx]
     if(len(pkt_idxs) > 0):
-        return select_pkt_start(pkt_idxs, log, idx_margin)
+        pkt_start = select_pkt_start(pkt_idxs, log, idx_margin)
+        return start_pkt
     else:
         log.warning('No active processing nodes. Cannot set PKTIDX')   
         return None
@@ -79,6 +115,16 @@ def create_addr_list_filled(addr0, n_groups, n_addrs, streams_per_instance):
     """Creates list of IP multicast subscription address groups.
     Fills the list for each available processing instance 
     sequentially untill all streams have been assigned.
+
+    Args:
+        addr0 (str): IP address of the first stream.
+        n_groups (int): Number of available processing instances.
+        n_addrs (int): Total number of streams to process.
+        streams_per_instance (int): Number of streams to be processed 
+        by each instance.
+
+    Returns:
+        addr_list (list): list of IP address groups for subscription.
     """
     prefix, suffix0 = addr0.rsplit('.', 1)
     addr_list = []
@@ -102,7 +148,7 @@ def create_addr_list_distributed(addr0, n_groups, n_addrs):
 
     Args:
         addr0 (str): first IP address in the list.
-        n_groups (int): number of available hashpipe instances.
+        n_groups (int): number of available processing instances.
         n_per_group (int): number of SPEAD stream addresses per instance.
 
     Returns:
@@ -142,6 +188,8 @@ def read_spead_addresses(spead_addrs, n_groups, streams_per_instance):
     return addr_list, port, n_addrs
 
 def cli():
+    """Command line interface. 
+    """
     usage = "usage: %prog [options]"
     parser = OptionParser(usage=usage)
     parser.add_option('-p', '--port', dest='port', type=long,
@@ -155,6 +203,14 @@ def cli():
     main(port=opts.port, cfg_file=opts.cfg_file)
 
 def configure(cfg_file):
+    """Configure the coordinator according to .yml config file.
+
+    Args:
+        cfg_file (str): File path for config file (.yml).
+
+    Returns:
+        List of instances and the number of streams to be processed per instance.
+    """
     try:
         with open(cfg_file, 'r') as f:
             try:
@@ -166,6 +222,19 @@ def configure(cfg_file):
         log.error('Config file not found')
 
 def pub_gateway_msg(red_server, chan_name, msg_name, msg_val, logger):
+    """Format and publish a hashpipe-Redis gateway message. Save messages
+    in a Redis hash for later use by reconfig tool. 
+
+    Args:
+        red_server: Redis server.
+        chan_name (str): Name of channel to be published to. 
+        msg_name (str): Name of key in status buffer.
+        msg_val (str): Value associated with key.
+        logger: Logger. 
+
+    Returns:
+        None
+    """
     msg = '{}={}'.format(msg_name, msg_val)
     red_server.publish(chan_name, msg)
     # save hash of most recent messages
@@ -173,12 +242,25 @@ def pub_gateway_msg(red_server, chan_name, msg_name, msg_val, logger):
     logger.info('Published {} to channel {}'.format(msg, chan_name))
 
 def cbf_sensor_name(product_id, redis_server, sensor):
+    """Builds the full name of a CBF sensor according to the 
+    CAM convention.  
+
+    Args:
+        product_id (str): Name of the current active subarray.
+        redis_server: Redis server.
+        sensor (str): Short sensor name (from the .yml config file).
+
+    Returns:
+        cbf_sensor (str): Full cbf sensor name for querying via KATPortal.
+    """
     subarray_nr = product_id[-1] # product ID ends in subarray number
     cbf_prefix = redis_server.get('{}:cbf_prefix'.format(product_id))
     cbf_sensor_prefix = '{}:cbf_{}_{}_'.format(product_id, subarray_nr, cbf_prefix)
-    return cbf_sensor_prefix + sensor
+    cbf_sensor = cbf_sensor_prefix + sensor
+    return cbf_sensor
 
 def main(port, cfg_file):
+    #Refactor this in future.
     log = set_logger(log_level = logging.DEBUG)
     log.info("Starting Coordinator")
     try:
