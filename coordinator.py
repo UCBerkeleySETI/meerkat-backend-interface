@@ -325,14 +325,14 @@ def main(port, cfg_file):
                 pub_gateway_msg(red, global_chan, 'CHAN_BW', coarse_chan_bw, log) 
                 for i in range(n_red_chans):
                     local_chan = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
-                    # Destination IP addresses for instance i
-                    pub_gateway_msg(red, local_chan, 'DESTIP', addr_list[i], log)
                     # Number of streams for instance i
                     n_streams_per_instance = int(addr_list[i][-1])+1
                     pub_gateway_msg(red, local_chan, 'NSTRM', n_streams_per_instance, log)
                     # Absolute starting channel for instance i
                     s_chan = i*n_streams_per_instance*int(n_chans_per_substream)
                     pub_gateway_msg(red, local_chan, 'SCHAN', s_chan, log)
+                    # Destination IP addresses for instance i
+                    pub_gateway_msg(red, local_chan, 'DESTIP', addr_list[i], log)
             if msg_type == 'deconfigure':
                 pub_gateway_msg(red, global_chan, 'DESTIP', '0.0.0.0', log)
                 log.info('Subarray deconfigured')
