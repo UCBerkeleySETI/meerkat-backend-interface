@@ -229,7 +229,7 @@ class BLKATPortalClient(object):
             if short_name in component:
                 full_name = component
         if full_name is None:
-            log.warning('Could not find component: {}'.format{short_name})
+            log.warning('Could not find component: {}'.format(short_name))
         return full_name 
 
     def _configure(self, product_id):
@@ -264,8 +264,9 @@ class BLKATPortalClient(object):
         #client = KATPortalClient(cam_url, on_update_callback=lambda x: self.on_update_callback_fn(product_id), logger=logger)
         self.subarray_katportals[product_id] = client
         logger.info("Created katportalclient object for : {}".format(product_id))
+        subarray_nr = product_id[-1]
         if(len(self.conf_sensors) > 0):
-            conf_sensor_names = ['subarray_{}_'.format(product_id[-1]) + sensor for sensor in self.conf_sensors]
+            conf_sensor_names = ['subarray_{}_'.format(subarray_nr) + sensor for sensor in self.conf_sensors]
             sensors_and_values = self.io_loop.run_sync(
                 lambda: self._get_sensor_values(product_id, conf_sensor_names))
             for sensor_name, details in sensors_and_values.items():
@@ -273,8 +274,9 @@ class BLKATPortalClient(object):
                 write_pair_redis(self.redis_server, key, details['value'])
         # Get CBF component name (in case it has changed to CBF_DEV_[product_id] 
         # instead of CBF_[product_id])
-        pool_resources = self.redis_server.get('pool_resources')
-        cbf_name = self.component_name('cbf', ast.literal_eval(pool_resources), log)
+        key = '{}:subarray_{}_{}'.format(product_id, subarray_nr, 'pool_resources')
+        pool_resources = self.redis_server.get(key).split(',')
+        cbf_name = self.component_name('cbf', pool_resources, logger)
         key = '{}:{}'.format(product_id, 'cbf_name')
         write_pair_redis(self.redis_server, key, cbf_name)
         if(len(self.cbf_conf_sensors) > 0):
