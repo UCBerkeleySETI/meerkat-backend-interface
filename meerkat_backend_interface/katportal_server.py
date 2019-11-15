@@ -209,6 +209,29 @@ class BLKATPortalClient(object):
         for sensor in self.cont_update_sensors:
             result = yield self.subarray_katportals[product_id].set_sampling_strategies(namespace, sensor, 'event')
 
+    def component_name(self, short_name, pool_resources, log):
+        """Determine the full name of a subarray component. 
+        This is most needed in the case of "dev" components - 
+        for example, cbf_dev_2 instead of cbf_2.
+        Returns the first match.
+
+        Args:
+            short_name (str): Short name of component (eg 'cbf').
+            pool_resources (str): List of components (str) in current 
+            subarray.
+            log: Logger.
+
+        Returns:
+            full_name (str): Full name of component.
+        """
+        full_name = None
+        for component in pool_resources:
+            if short_name in component:
+                full_name = component
+        if full_name is None:
+            log.warning('Could not find component: {}'.format{short_name})
+        return full_name 
+
     def _configure(self, product_id):
         """Executes when configure request is processed
 
@@ -248,10 +271,16 @@ class BLKATPortalClient(object):
             for sensor_name, details in sensors_and_values.items():
                 key = "{}:{}".format(product_id, sensor_name)
                 write_pair_redis(self.redis_server, key, details['value'])
+        # Get CBF component name (in case it has changed to CBF_DEV_[product_id] 
+        # instead of CBF_[product_id])
+        pool_resources = self.redis_server.get('pool_resources')
+        cbf_name = self.component_name('cbf', ast.literal_eval(pool_resources), log)
+        key = '{}:{}'.format(product_id, 'cbf_name')
+        write_pair_redis(self.redis_server, key, cbf_name)
         if(len(self.cbf_conf_sensors) > 0):
-            #Complete the CBF sensor names with product ID number
+            #Complete the CBF sensor names with the CBF component name.
             cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
-            cbf_sensor_prefix = 'cbf_{}_{}_'.format(product_id[-1], cbf_prefix)
+            cbf_sensor_prefix = '{}_{}_'.format(cbf_name, cbf_prefix)
             cbf_conf_sensor_names = [cbf_sensor_prefix + sensor for sensor in self.cbf_conf_sensors]
             sensors_and_values = self.io_loop.run_sync(
                 lambda: self._get_sensor_values(product_id, cbf_conf_sensor_names))

@@ -253,9 +253,9 @@ def cbf_sensor_name(product_id, redis_server, sensor):
     Returns:
         cbf_sensor (str): Full cbf sensor name for querying via KATPortal.
     """
-    subarray_nr = product_id[-1] # product ID ends in subarray number
+    cbf_name = redis_server.get('{}:cbf_name'.format(product_id))
     cbf_prefix = redis_server.get('{}:cbf_prefix'.format(product_id))
-    cbf_sensor_prefix = '{}:cbf_{}_{}_'.format(product_id, subarray_nr, cbf_prefix)
+    cbf_sensor_prefix = '{}:{}_{}_'.format(product_id, cbf_name, cbf_prefix)
     cbf_sensor = cbf_sensor_prefix + sensor
     return cbf_sensor
 
