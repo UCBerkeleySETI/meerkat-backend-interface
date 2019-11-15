@@ -91,7 +91,7 @@ def get_start_idx(red_server, host_list, idx_margin, log):
         if(pkt_idx is not None):
             pkt_idxs = pkt_idxs + [pkt_idx]
     if(len(pkt_idxs) > 0):
-        pkt_start = select_pkt_start(pkt_idxs, log, idx_margin)
+        start_pkt = select_pkt_start(pkt_idxs, log, idx_margin)
         return start_pkt
     else:
         log.warning('No active processing nodes. Cannot set PKTIDX')   

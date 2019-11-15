@@ -14,7 +14,6 @@ from meerkat_backend_interface.logger import set_logger
 def cli(prog=sys.argv[0]):
     usage = "{} [options]".format(prog)
     description = 'start BLUSE KATCP server'
-
     parser = ArgumentParser(usage=usage,
                             description=description,
                             formatter_class=ArgumentDefaultsHelpFormatter)
@@ -34,7 +33,6 @@ def cli(prog=sys.argv[0]):
         type=str,
         default="effelsberg",
         help='name of the nodeset to use')
-
     # Options for development and testing
     title = "development and testing"
     description = "additional convenience settings"
@@ -44,17 +42,14 @@ def cli(prog=sys.argv[0]):
         '--debug',
         action='store_true',
         help='verbose logger output for debugging')
-
     args = parser.parse_args()
     main(ip=args.ip, port=args.port, debug=args.debug)
-
 
 @tornado.gen.coroutine
 def on_shutdown(ioloop, server, log):
     log.info("Shutting down server")
     yield server.stop()
     ioloop.stop()
-
 
 def main(ip, port, debug):
     if debug:
@@ -65,17 +60,14 @@ def main(ip, port, debug):
 
     log = set_logger(log_level=log_level)
     log.info("Starting BLBackendInterface instance")
-
     ioloop = tornado.ioloop.IOLoop.current()
     server = BLBackendInterface(ip, port)
     signal.signal(signal.SIGINT,
                   lambda sig, frame: ioloop.add_callback_from_signal(
                       on_shutdown, ioloop, server, log))
-
     def start():
         server.start()
         log.info("Listening at {0}, Ctrl-C to terminate server".format(server.bind_address))
-
     ioloop.add_callback(start)
     ioloop.start()
 

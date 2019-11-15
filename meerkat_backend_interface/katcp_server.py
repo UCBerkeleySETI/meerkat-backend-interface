@@ -186,12 +186,12 @@ ___,-| |----''    / |         `._`-.          `----
             None... but replies with "ok" or "fail" and logs either info or error
 
         Writes:
-            - subbarry1_abc65555:timestamp" -> "1534657577373.23423"  :: Redis String
-            - subarray1_abc65555:antennas" -> [1,2,3,4] :: Redis List
-            - subarray1_abc65555:n_channels" -> "4096" :: Redis String
-            - subarray1_abc65555:proxy_name "-> "BLUSE_whatever" :: Redis String
-            - subarray1_abc65555:streams" -> {....} :: Redis Hash !!!CURRENTLY A STRING!!!
-            - current:obs:id -> "subbary1_abc65555"
+            - [product_id]:timestamp" -> "1534657577373.23423"  :: Redis String
+            - [product_id]:antennas" -> [1,2,3,4] :: Redis List
+            - [product_id]:n_channels" -> "4096" :: Redis String
+            - [product_id]:proxy_name "-> "BLUSE_whatever" :: Redis String
+            - [product_id]:streams" -> {....} :: Redis Hash !!!CURRENTLY A STRING!!!
+            - current:obs:id -> [product_id]
 
         Publishes:
             redis-channel: 'alerts' <-- "configure"

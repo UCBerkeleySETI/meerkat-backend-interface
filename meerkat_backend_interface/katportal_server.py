@@ -117,6 +117,17 @@ class BLKATPortalClient(object):
                     self.subarray_consensus(product_id, 'target')
 
     def subarray_data_suspect(self, product_id):
+        """Publish a global subarray data-suspect value by checking each
+        individual antenna. If any antennas are marked faulty by an operator, 
+        they are logged, but the subarray data-suspect remains False 
+        so that the observation may continue with the remaining antennas.
+
+        Args:
+            product_id (str): Name of the current subarray.
+
+        Returns:
+            None
+        """
         ant_key = '{}:antennas'.format(product_id)
 	ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
 	ant_status = []
@@ -140,6 +151,17 @@ class BLKATPortalClient(object):
             publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:{}'.format(product_id, True))
 
     def subarray_consensus(self, product_id, sensor_name):
+        """Determine if a particular sensor value is the same for all antennas
+        in a particular subarray.
+
+        Args:
+            product_id (str): Name of the current subarray.
+            sensor_name (str): Sensor to be checked for each antenna. Note that
+            only per-antenna sensors can be specified.
+
+        Returns:
+            None
+        """
         ant_key = '{}:antennas'.format(product_id)
         ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))
         ant_status = ''
@@ -181,6 +203,14 @@ class BLKATPortalClient(object):
         return ant_sensor_list
 
     def configure_katportal(self, cfg_file):
+        """Configure the katportal_server from the .yml config file.
+      
+        Args:
+            cfg_file (str): File path to .yml config file.
+      
+        Returns:
+            None
+        """
         try:
             with open(cfg_file, 'r') as f:
                 try:
