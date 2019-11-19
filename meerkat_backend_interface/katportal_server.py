@@ -58,7 +58,7 @@ class BLKATPortalClient(object):
         self.subarray_katportals = dict()  # indexed by product id's
         self.config_file = config_file
         self.ant_sensors = []  # sensors required from each antenna
-        self.cont_update_sensors = []  # other sensors for continuous update
+        self.stream_sensors = []  # other sensors for continuous update
         self.cbf_conf_sensors = []  # cbf sensors to be queried once-off on configure
         self.conf_sensors = [] # other sensors to be queried once-off on configure
         self.config_file = config_file #check if needed
@@ -102,19 +102,20 @@ class BLKATPortalClient(object):
             if key == 'msg_data':
                 sensor_name = msg['msg_data']['name']
                 sensor_value = msg['msg_data']['value']
+                sensor_status = msg['msg_data']['status']
                 # sensors for continuous update
                 if sensor_name in self.cont_update_sensors:
                     key = "{}:{}".format(product_id, sensor_name)
                     write_pair_redis(self.redis_server, key, repr(sensor_value))
-                    #publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}'.format(sensor_name, sensor_value))
-                # subarray data-suspect
+                # data-suspect mask for publication
                 if('data_suspect' in sensor_name):
-                    self.subarray_data_suspect(product_id)
-                if('marked_faulty' in sensor_name):
-                    self.subarray_data_suspect(product_id)
-                # subarray target
+                    # Make sure sensor value is trustworthy
+                    # as these particular sensors take extra time 
+                    # to initialise. 
+                    if(sensor_status == 'nominal'):
+                        publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:{}'.format(product_id, sensor_name, sensor_value))
                 if('target' in sensor_name):
-                    self.subarray_consensus(product_id, 'target')
+                    self.antenna_consensus(product_id, 'target')
 
     def subarray_data_suspect(self, product_id):
         """Publish a global subarray data-suspect value by checking each
@@ -129,8 +130,8 @@ class BLKATPortalClient(object):
             None
         """
         ant_key = '{}:antennas'.format(product_id)
-	ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
-	ant_status = []
+	    ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
+	    ant_status = []
         try:
 	    for i in range(len(ant_list)):
                 data_suspect = ast.literal_eval(self.redis_server.get('{}:{}_data_suspect'.format(product_id, ant_list[i])))
@@ -150,7 +151,40 @@ class BLKATPortalClient(object):
             # If any of the sensors are not available, set subarray data suspect flag to True
             publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:{}'.format(product_id, True))
 
-    def subarray_consensus(self, product_id, sensor_name):
+    def subarray_consensus(self, product_id, sensor, value, components, n_stragglers):
+        """Determine if a particular sensor value is the same as a specified 
+        value for all of the specified components in a particular subarray, with 
+        the exception of a number of stragglers.
+
+        Args:
+            product_id (str): Name of the current subarray.
+            sensor (str): Sensor to be checked for each component. Note that
+            only per-component sensors can be specified.
+            value (str): The desired value of all the components.
+            components (list): List of components (str).
+            n_stragglers (int): The number of components for which a consensus
+            is still accepted. 
+
+        Returns:
+            consensus (bool): If a subarray consensus has been reached
+            or not, subject to the n_stragglers condition.
+            mask (str): Mask of which components exhibit the desired value.
+            0 is true, 1 is false. 
+        """
+        mask = np.ones(len(components))
+        consensus = False
+        sensor_list = ['{}:{}_{}'.format(product_id, component, sensor) for component in components]
+        components_status = self.redis_server.mget(sensor_list)
+        for i, status in enumerate(components_status):
+            if(status == value):
+                mask[i] = 0
+        if(np.sum(mask) <= n_stragglers):
+            consensus = True
+        else:
+            logger.info('Consensus for {} not reached'.format(sensor))
+        return consensus, mask
+
+    def antenna_consensus(self, product_id, sensor_name):
         """Determine if a particular sensor value is the same for all antennas
         in a particular subarray.
 
@@ -183,8 +217,6 @@ class BLKATPortalClient(object):
 
     def gen_ant_sensor_list(self, product_id, ant_sensors):
         """Automatically builds a list of sensor names for each antenna.
-           Initialises these sensors to their current value where possible,
-           or to 'unavailable' if not available.
 
         Args:
             product_id (str): the product id given in the ?configure request
@@ -202,6 +234,22 @@ class BLKATPortalClient(object):
                 ant_sensor_list.append(ant + '_' + sensor)
         return ant_sensor_list
 
+    def gen_stream_sensor_list(self, product_id, stream_sensors, cbf_name):
+        """Automatically builds a list of stream sensor names.
+
+        Args:
+            product_id (str): The product id given in the ?configure request.
+            stream_sensors (list): The stream sensors to be subscribed to.
+
+        Returns:
+            stream_sensor_list (list): the full sensor names.
+        """
+        stream_sensor_list = []
+        for sensor in sensor_list:
+            sensor_name = 'subarray_{}_streams_{}_{}'.format(product_id[-1], cbf_name, sensor)
+            stream_sensor_list.append(ant + '_' + sensor)
+        return stream_sensor_list
+
     def configure_katportal(self, cfg_file):
         """Configure the katportal_server from the .yml config file.
       
@@ -216,27 +264,27 @@ class BLKATPortalClient(object):
                 try:
                     cfg = yaml.safe_load(f)
                     return(cfg['sensors_per_antenna'], cfg['cbf_sensors_on_configure'],           
-                    cfg['sensors_cont_update'], cfg['sensors_on_configure'])
+                    cfg['stream_sensors'], cfg['sensors_on_configure'])
                 except yaml.YAMLError as E:
                     logger.error(E)
         except IOError:
             logger.error('Config file not found')
 
     @tornado.gen.coroutine
-    def subscribe_sensors(self, product_id):
+    def subscribe_sensors(self, product_id, sensor_list):
         """Subscribes to each sensor listed for asynchronous updates.
-
+        
         Args:
-            product_id (str): the product id given in the ?configure request
+            sensor_list (list): Full names of sensors to subscribe to.
+            product_id (str): The product ID given in the ?configure request.
 
         Returns:
             None
         """
-        self.cont_update_sensors.extend(self.gen_ant_sensor_list(product_id, self.ant_sensors))
         yield self.subarray_katportals[product_id].connect()
         namespace = 'namespace_' + str(uuid.uuid4())
         result = yield self.subarray_katportals[product_id].subscribe(namespace)
-        for sensor in self.cont_update_sensors:
+        for sensor in sensor_list:
             result = yield self.subarray_katportals[product_id].set_sampling_strategies(namespace, sensor, 'event')
 
     def component_name(self, short_name, pool_resources, log):
@@ -273,16 +321,16 @@ class BLKATPortalClient(object):
         """
         # Update configuration:
         try:
-            ant_sensors, cbf_conf_sensors, cont_update_sensors, conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
+            ant_sensors, cbf_conf_sensors, stream_sensors, conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
             if(ant_sensors is not None):
                 self.ant_sensors = []
                 self.ant_sensors.extend(ant_sensors)
             if(cbf_conf_sensors is not None):
                 self.cbf_conf_sensors = []
                 self.cbf_conf_sensors.extend(cbf_conf_sensors)
-            if(cont_update_sensors is not None):
-                self.cont_update_sensors = []
-                self.cont_update_sensors.extend(cont_update_sensors)
+            if(stream_sensors is not None):
+                self.stream_sensors = []
+                self.stream_sensors.extend(stream_sensors)
             if(conf_sensors is not None):
                 self.conf_sensors = []
                 self.conf_sensors.extend(conf_sensors)
@@ -309,6 +357,7 @@ class BLKATPortalClient(object):
         cbf_name = self.component_name('cbf', pool_resources, logger)
         key = '{}:{}'.format(product_id, 'cbf_name')
         write_pair_redis(self.redis_server, key, cbf_name)
+        # Get CBF sensor values required on configure.
         if(len(self.cbf_conf_sensors) > 0):
             #Complete the CBF sensor names with the CBF component name.
             cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
@@ -319,6 +368,7 @@ class BLKATPortalClient(object):
             for sensor_name, details in sensors_and_values.items():
                 key = "{}:{}".format(product_id, sensor_name)
                 write_pair_redis(self.redis_server, key, repr(details['value']))
+        # Indicate to anyone listening that the configure process is complete. 
         publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 'conf_complete:{}'.format(product_id))
 
     def _capture_init(self, product_id):
@@ -334,11 +384,7 @@ class BLKATPortalClient(object):
         key = "{}:schedule_blocks".format(product_id)
         write_pair_redis(self.redis_server, key, json.dumps(schedule_blocks))
         publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, key)
-        # Start io_loop to listen to sensors whose values should be registered
-        # immediately when they change.
-        self.io_loop.add_callback(lambda: self.subscribe_sensors(product_id))
-        self.io_loop.start()
-        # Once off sensor values
+        # Once off sensor values on capture-init
         sensors_to_query = []  # TODO: add sensors to query on ?capture_init
         sensors_and_values = self.io_loop.run_sync(
             lambda: self._get_sensor_values(product_id, sensors_to_query))
@@ -353,25 +399,18 @@ class BLKATPortalClient(object):
             product_id (str): the product id given in the ?configure request
 
         Returns:
-            None, but does many things!
+            None
         """
-        # TODO: get more information?
-        pass
-
-    def _capture_stop(self, product_id):
-        """Responds to capture-stop request
-
-        Args:
-            product_id (str): the product id given in the ?configure request
-
-        Returns:
-            None, but does many things!
-        """
-        #msg_parts = message['data'].split(':')
-        #product_id = msg_parts[1] # the element after the capture-stop identifier
-        #client = self.subarray_katportals[product_id]
-        # TODO: get more information?
-        print('Capture stopped')
+        # Get cont update sensors
+        sensors_for_update = []
+        sensors_for_update.extend(self.gen_ant_sensor_list(product_id, self.ant_sensors))
+        cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
+        sensors_for_update.extend(self.gen_stream_sensor_list(product_id, self.stream_sensors, cbf_prefix))
+        # Start io_loop to listen to sensors whose values should be registered
+        # immediately when they change.
+        if(len(sensors_for_update > 0)):
+            self.io_loop.add_callback(lambda: self.subscribe_sensors(product_id, sensors_for_update))
+            self.io_loop.start()
 
     def _capture_done(self, product_id):
         """Responds to capture-done request

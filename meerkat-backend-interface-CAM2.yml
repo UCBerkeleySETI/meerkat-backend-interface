@@ -21,9 +21,7 @@ hashpipe_instances:
 - blpn62/0
 - blpn63/0
 
-sensors_per_antenna:
-- marked_faulty
-- data_suspect           
+sensors_per_antenna:         
 - target
 
 sensors_on_configure:
@@ -36,7 +34,8 @@ cbf_sensors_on_configure:
 - antenna_channelised_voltage_n_samples_between_spectra
 - adc_sample_rate
 
-sensors_cont_update:
+stream_sensors:
+- antenna_channelised_voltage_input_data_suspect
 
 
  
