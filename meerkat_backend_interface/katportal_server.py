@@ -10,6 +10,8 @@ import json
 import yaml
 import os
 import ast
+import json
+import numpy as np
 
 from .redis_tools import (
     REDIS_CHANNELS,
@@ -58,9 +60,10 @@ class BLKATPortalClient(object):
         self.subarray_katportals = dict()  # indexed by product id's
         self.config_file = config_file
         self.ant_sensors = []  # sensors required from each antenna
-        self.stream_sensors = []  # other sensors for continuous update
+        self.stream_sensors = []  # stream sensors (for continuous update)
         self.cbf_conf_sensors = []  # cbf sensors to be queried once-off on configure
         self.conf_sensors = [] # other sensors to be queried once-off on configure
+        self.cont_update_sensors = [] # will contain all sensors for continuous update
         self.config_file = config_file #check if needed
 
     def MSG_TO_FUNCTION(self, msg_type):
@@ -113,7 +116,9 @@ class BLKATPortalClient(object):
                     # as these particular sensors take extra time 
                     # to initialise. 
                     if(sensor_status == 'nominal'):
-                        publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:{}'.format(product_id, sensor_name, sensor_value))
+                        publish_to_redis(self.redis_server, 
+                        REDIS_CHANNELS.sensor_alerts, 
+                        '{}:{}:{}'.format(product_id, sensor_name, sensor_value))
                 if('target' in sensor_name):
                     self.antenna_consensus(product_id, 'target')
 
@@ -130,8 +135,8 @@ class BLKATPortalClient(object):
             None
         """
         ant_key = '{}:antennas'.format(product_id)
-	    ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
-	    ant_status = []
+	ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
+	ant_status = []
         try:
 	    for i in range(len(ant_list)):
                 data_suspect = ast.literal_eval(self.redis_server.get('{}:{}_data_suspect'.format(product_id, ant_list[i])))
@@ -208,9 +213,11 @@ class BLKATPortalClient(object):
                 # Get value from last antenna
                 value = ast.literal_eval(self.redis_server.get('{}:{}_{}'.format(product_id, ant_list[i], sensor_name))) 
                 if(len(value)>0):
-                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:{}'.format(product_id, sensor_name, value))
+                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, 
+                    '{}:{}:{}'.format(product_id, sensor_name, value))
                 else:
-                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:unavailable'.format(product_id, sensor_name))
+                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, 
+                    '{}:{}:unavailable'.format(product_id, sensor_name))
         except:
             # If any of the sensors are not available:
             publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:unavailable'.format(product_id, sensor_name))
@@ -245,9 +252,9 @@ class BLKATPortalClient(object):
             stream_sensor_list (list): the full sensor names.
         """
         stream_sensor_list = []
-        for sensor in sensor_list:
+        for sensor in stream_sensors:
             sensor_name = 'subarray_{}_streams_{}_{}'.format(product_id[-1], cbf_name, sensor)
-            stream_sensor_list.append(ant + '_' + sensor)
+            stream_sensor_list.append(sensor_name)
         return stream_sensor_list
 
     def configure_katportal(self, cfg_file):
@@ -359,17 +366,43 @@ class BLKATPortalClient(object):
         write_pair_redis(self.redis_server, key, cbf_name)
         # Get CBF sensor values required on configure.
         if(len(self.cbf_conf_sensors) > 0):
-            #Complete the CBF sensor names with the CBF component name.
+            # Complete the CBF sensor names with the CBF component name.
             cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
             cbf_sensor_prefix = '{}_{}_'.format(cbf_name, cbf_prefix)
             cbf_conf_sensor_names = [cbf_sensor_prefix + sensor for sensor in self.cbf_conf_sensors]
+            # Get CBF sensors and write to redis. 
             sensors_and_values = self.io_loop.run_sync(
                 lambda: self._get_sensor_values(product_id, cbf_conf_sensor_names))
             for sensor_name, details in sensors_and_values.items():
                 key = "{}:{}".format(product_id, sensor_name)
-                write_pair_redis(self.redis_server, key, repr(details['value']))
+                write_pair_redis(self.redis_server, key, details['value'])
+            # Calculate antenna-to-Fengine mapping
+            antennas, feng_ids = self.antenna_mapping(product_id, cbf_sensor_prefix)
+            write_pair_redis(self.redis_server, '{}:antenna_names'.format(product_id), antennas)
+            write_pair_redis(self.redis_server, '{}:feng_ids'.format(product_id), feng_ids)
         # Indicate to anyone listening that the configure process is complete. 
         publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 'conf_complete:{}'.format(product_id))
+
+    def antenna_mapping(self, product_id, cbf_sensor_prefix):
+        """Get the mapping from antenna to F-engine ID as given in 
+        packet headers.
+
+        Args:
+            product_id (str): Identifier of current subarray.
+            cbf_sensor_prefix (str): Prefix for the sensor name
+            according to the current subarray configuration. 
+            Eg: "cbf_1_wide_"
+
+        Returns:
+            antennas (list): List of antenna names.
+            feng_ids (list): List of corresponding F-engine IDs.
+        """
+        labelling_sensor = '{}:{}input_labelling'.format(product_id, cbf_sensor_prefix)
+        labelling = self.redis_server.get(labelling_sensor)
+        labelling = ast.literal_eval(labelling)
+        antennas = [item[0] for item in labelling]
+        feng_ids = [int(np.floor(int(item[1])/2.0)) for item in labelling]
+        return antennas, feng_ids
 
     def _capture_init(self, product_id):
         """Responds to capture-init request by getting schedule blocks
@@ -408,7 +441,7 @@ class BLKATPortalClient(object):
         sensors_for_update.extend(self.gen_stream_sensor_list(product_id, self.stream_sensors, cbf_prefix))
         # Start io_loop to listen to sensors whose values should be registered
         # immediately when they change.
-        if(len(sensors_for_update > 0)):
+        if(len(sensors_for_update) > 0):
             self.io_loop.add_callback(lambda: self.subscribe_sensors(product_id, sensors_for_update))
             self.io_loop.start()
 
@@ -451,6 +484,9 @@ class BLKATPortalClient(object):
         else:
             self.subarray_katportals.pop(product_id)
             logger.info("Deleted KATPortalClient instance for product_id: {}".format(product_id))
+
+    def _capture_stop(self, product_id):
+        pass
 
     def _other(self, product_id):
         """This is called when an unrecognized request is sent

@@ -33,6 +33,7 @@ cbf_sensors_on_configure:
 - sync_time
 - antenna_channelised_voltage_n_samples_between_spectra
 - adc_sample_rate
+- input_labelling
 
 stream_sensors:
 - antenna_channelised_voltage_input_data_suspect
