@@ -120,7 +120,7 @@ class BLKATPortalClient(object):
                     if(sensor_status == 'nominal'):
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
-                        '{}:{}:{}'.format(product_id, 'data-suspect', sensor_value))
+                        '{}:{}:{}'.format('data-suspect', product_id, sensor_value))
                 if('target' in sensor_name):
                     self.antenna_consensus(product_id, 'target')
 

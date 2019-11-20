@@ -10,8 +10,8 @@ import numpy as np
 from meerkat_backend_interface import redis_tools
 from meerkat_backend_interface.logger import log, set_logger
 
-ALERTS_CHANNEL = redis_tools.REDIS_CHANNELS.alerts  # Redis channel to listen on
-SENSOR_CHANNEL = redis_tools.REDIS_CHANNELS.sensor_alerts  # Redis channel to listen on
+ALERTS_CHANNEL = redis_tools.REDIS_CHANNELS.alerts
+SENSOR_CHANNEL = redis_tools.REDIS_CHANNELS.sensor_alerts  # Redis channels to listen to
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'  # Type of stream to distribute
 HPGDOMAIN   = 'bluse'
 PKTIDX_MARGIN = 1024 # Safety margin for setting index of first packet to record.
@@ -30,8 +30,11 @@ def get_pkt_idx(red_server, host_key):
     """
     pkt_idx = None
     host_status = red_server.hgetall(host_key)
-    if(host_status['NETSTAT'] != 'idle'):
-        pkt_idx = host_status['PKTIDX']
+    if(len(host_status) > 0):
+        if(host_status['NETSTAT'] != 'idle'):
+            pkt_idx = host_status['PKTIDX']
+    else:
+        log.warning('Cannot acquire {}'.format(host_key))
     return pkt_idx
 
 def select_pkt_start(pkt_idxs, log, idx_margin):
@@ -271,7 +274,8 @@ def main(port, cfg_file):
         log.warning('Configuration not updated; old configuration might be present.')
     red = redis.StrictRedis(port=port)
     ps = red.pubsub(ignore_subscribe_messages=True)
-    ps.subscribe(ALERTS_CHANNEL, SENSOR_CHANNEL)
+    ps.subscribe(ALERTS_CHANNEL)
+    ps.subscribe(SENSOR_CHANNEL)
     try:
         for message in ps.listen():
             msg_parts = message['data'].split(':')
@@ -339,7 +343,7 @@ def main(port, cfg_file):
                 log.info('Subarray deconfigured')
             if msg_type == 'data-suspect':
                 mask = msg_parts[2]
-                bitmask = format(int(mask, 2), 'x')
+                bitmask = hex(int(mask, 2))
                 pub_gateway_msg(red, global_chan, 'FESTATUS', bitmask, log)
             if msg_type == 'capture-start':
                 pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
