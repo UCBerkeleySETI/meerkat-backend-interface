@@ -115,10 +115,12 @@ class BLKATPortalClient(object):
                     # Make sure sensor value is trustworthy
                     # as these particular sensors take extra time 
                     # to initialise. 
+                    # Note: assumes only one data-suspect sensor is 
+                    # to be used.
                     if(sensor_status == 'nominal'):
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
-                        '{}:{}:{}'.format(product_id, sensor_name, sensor_value))
+                        '{}:{}:{}'.format(product_id, 'data-suspect', sensor_value))
                 if('target' in sensor_name):
                     self.antenna_consensus(product_id, 'target')
 
@@ -135,8 +137,8 @@ class BLKATPortalClient(object):
             None
         """
         ant_key = '{}:antennas'.format(product_id)
-	ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
-	ant_status = []
+        ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
+        ant_status = []
         try:
 	    for i in range(len(ant_list)):
                 data_suspect = ast.literal_eval(self.redis_server.get('{}:{}_data_suspect'.format(product_id, ant_list[i])))

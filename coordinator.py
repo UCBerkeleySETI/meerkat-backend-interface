@@ -10,7 +10,8 @@ import numpy as np
 from meerkat_backend_interface import redis_tools
 from meerkat_backend_interface.logger import log, set_logger
 
-CHANNEL     = redis_tools.REDIS_CHANNELS.alerts  # Redis channel to listen on
+ALERTS_CHANNEL = redis_tools.REDIS_CHANNELS.alerts  # Redis channel to listen on
+SENSOR_CHANNEL = redis_tools.REDIS_CHANNELS.sensor_alerts  # Redis channel to listen on
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'  # Type of stream to distribute
 HPGDOMAIN   = 'bluse'
 PKTIDX_MARGIN = 1024 # Safety margin for setting index of first packet to record.
@@ -270,11 +271,11 @@ def main(port, cfg_file):
         log.warning('Configuration not updated; old configuration might be present.')
     red = redis.StrictRedis(port=port)
     ps = red.pubsub(ignore_subscribe_messages=True)
-    ps.subscribe(CHANNEL)
+    ps.subscribe(ALERTS_CHANNEL, SENSOR_CHANNEL)
     try:
         for message in ps.listen():
             msg_parts = message['data'].split(':')
-            if len(msg_parts) != 2:
+            if len(msg_parts) < 2:
                 log.info("Not processing this message --> {}".format(message))
                 continue
             msg_type = msg_parts[0]
@@ -336,6 +337,10 @@ def main(port, cfg_file):
             if msg_type == 'deconfigure':
                 pub_gateway_msg(red, global_chan, 'DESTIP', '0.0.0.0', log)
                 log.info('Subarray deconfigured')
+            if msg_type == 'data-suspect':
+                mask = msg_parts[2]
+                bitmask = format(int(mask, 2), 'x')
+                pub_gateway_msg(red, global_chan, 'FESTATUS', bitmask, log)
             if msg_type == 'capture-start':
                 pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
                 pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log) 
