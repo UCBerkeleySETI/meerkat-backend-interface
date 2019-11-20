@@ -366,10 +366,10 @@ def main(port, cfg_file):
             if msg_type == 'tracking':
                 pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
                 pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log) 
-            if msg_type == 'tracking-stopped':
+            if msg_type == 'not-tracking':
                 # For the moment during testing, get dwell time from one of the hosts.
                 # Then set to zero and then back to to the original dwell time.
-                host_key = '{}://{}/status'.format(HPGDOMAIN, hashpipe_instances[0])
+                host_key = '{}://{}/status'.format(HPGDOMAIN, hashpipe_instances[2])
                 dwell_time = get_dwell_time(red, host_key)
                 pub_gateway_msg(red, global_chan, 'DWELL', '0', log)
                 pub_gateway_msg(red, global_chan, 'DWELL', dwell_time, log)

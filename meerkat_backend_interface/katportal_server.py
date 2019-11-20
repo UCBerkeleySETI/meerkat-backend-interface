@@ -129,11 +129,11 @@ class BLKATPortalClient(object):
                     if(sensor_value == 'track'):
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
-                        '{}:{}:{}'.format('tracking', product_id))
+                        '{}:{}'.format('tracking', product_id))
                     else:
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
-                        '{}:{}:{}'.format('tracking-stopped', product_id))      
+                        '{}:{}'.format('not-tracking', product_id))      
 
     def subarray_data_suspect(self, product_id):
         """Publish a global subarray data-suspect value by checking each
