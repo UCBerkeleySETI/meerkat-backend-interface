@@ -31,11 +31,29 @@ def get_pkt_idx(red_server, host_key):
     pkt_idx = None
     host_status = red_server.hgetall(host_key)
     if(len(host_status) > 0):
-        if(host_status['NETSTAT'] != 'idle'):
-            pkt_idx = host_status['PKTIDX']
+        if('NETSTAT' in host_status):
+            if(host_status['NETSTAT'] != 'idle'):
+                if('PKTIDX' in host_status):
+                    pkt_idx = host_status['PKTIDX']
+                else:
+                    log.warning('PKTIDX is missing for {}'.format(host_key))
+            else:
+                log.warning('NETSTAT is missing for {}'.format(host_key))
     else:
         log.warning('Cannot acquire {}'.format(host_key))
     return pkt_idx
+
+def get_dwell_time(red_server, host_key):
+    dwell_time = 0
+    host_status = red_server.hgetall(host_key)
+    if(len(host_status) > 0):
+        if('DWELL' in host_status):
+            dwell_time = host_status['DWELL']
+        else:
+            log.warning('DWELL is missing for {}'.format(host_key))
+    else:
+        log.warning('Cannot acquire {}'.format(host_key))
+    return dwell_time
 
 def select_pkt_start(pkt_idxs, log, idx_margin):
     """Calculates the index of the first packet from which to record 
@@ -345,11 +363,17 @@ def main(port, cfg_file):
                 mask = msg_parts[2]
                 bitmask = hex(int(mask, 2))
                 pub_gateway_msg(red, global_chan, 'FESTATUS', bitmask, log)
-            if msg_type == 'capture-start':
+            if msg_type == 'tracking':
                 pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
                 pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log) 
-            if msg_type == 'capture-stop':
-                pub_gateway_msg(red, global_chan, 'NETSTAT', 'LISTEN', log)
+            if msg_type == 'tracking-stopped':
+                # For the moment during testing, get dwell time from one of the hosts.
+                # Then set to zero and then back to to the original dwell time.
+                host_key = '{}://{}/status'.format(HPGDOMAIN, hashpipe_instances[0])
+                dwell_time = get_dwell_time(red, host_key)
+                pub_gateway_msg(red, global_chan, 'DWELL', '0', log)
+                pub_gateway_msg(red, global_chan, 'DWELL', dwell_time, log)
+
     except KeyboardInterrupt:
         log.info("Stopping coordinator")
         sys.exit(0)

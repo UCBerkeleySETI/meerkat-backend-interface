@@ -63,6 +63,7 @@ class BLKATPortalClient(object):
         self.stream_sensors = []  # stream sensors (for continuous update)
         self.cbf_conf_sensors = []  # cbf sensors to be queried once-off on configure
         self.conf_sensors = [] # other sensors to be queried once-off on configure
+        self.subarray_sensors = [] # subarray-level sensors
         self.cont_update_sensors = [] # will contain all sensors for continuous update
         self.config_file = config_file #check if needed
 
@@ -105,24 +106,34 @@ class BLKATPortalClient(object):
             if key == 'msg_data':
                 sensor_name = msg['msg_data']['name']
                 sensor_value = msg['msg_data']['value']
-                sensor_status = msg['msg_data']['status']
-                # sensors for continuous update
-                if sensor_name in self.cont_update_sensors:
-                    key = "{}:{}".format(product_id, sensor_name)
-                    write_pair_redis(self.redis_server, key, repr(sensor_value))
-                # data-suspect mask for publication
+                # Write sensors (continuous update)
+                key = "{}:{}".format(product_id, sensor_name)
+                write_pair_redis(self.redis_server, key, repr(sensor_value))
+                # Data-suspect mask for publication
                 if('data_suspect' in sensor_name):
                     # Make sure sensor value is trustworthy
                     # as these particular sensors take extra time 
                     # to initialise. 
                     # Note: assumes only one data-suspect sensor is 
                     # to be used.
+                    sensor_status = msg['msg_data']['status']
                     if(sensor_status == 'nominal'):
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
                         '{}:{}:{}'.format('data-suspect', product_id, sensor_value))
+                # Target information for publication
                 if('target' in sensor_name):
                     self.antenna_consensus(product_id, 'target')
+                # Observation state for publication
+                if('activity' in sensor_name):
+                    if(sensor_value == 'track'):
+                        publish_to_redis(self.redis_server, 
+                        REDIS_CHANNELS.sensor_alerts, 
+                        '{}:{}:{}'.format('tracking', product_id))
+                    else:
+                        publish_to_redis(self.redis_server, 
+                        REDIS_CHANNELS.sensor_alerts, 
+                        '{}:{}:{}'.format('tracking-stopped', product_id))      
 
     def subarray_data_suspect(self, product_id):
         """Publish a global subarray data-suspect value by checking each
@@ -273,7 +284,8 @@ class BLKATPortalClient(object):
                 try:
                     cfg = yaml.safe_load(f)
                     return(cfg['sensors_per_antenna'], cfg['cbf_sensors_on_configure'],           
-                    cfg['stream_sensors'], cfg['sensors_on_configure'])
+                    cfg['stream_sensors'], cfg['sensors_on_configure'],
+                    cfg['array_sensors'])
                 except yaml.YAMLError as E:
                     logger.error(E)
         except IOError:
@@ -330,7 +342,7 @@ class BLKATPortalClient(object):
         """
         # Update configuration:
         try:
-            ant_sensors, cbf_conf_sensors, stream_sensors, conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
+            ant_sensors, cbf_conf_sensors, stream_sensors, conf_sensors, subarray_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
             if(ant_sensors is not None):
                 self.ant_sensors = []
                 self.ant_sensors.extend(ant_sensors)
@@ -343,6 +355,9 @@ class BLKATPortalClient(object):
             if(conf_sensors is not None):
                 self.conf_sensors = []
                 self.conf_sensors.extend(conf_sensors)
+            if(subarray_sensors is not None):
+                self.subarray_sensors = []
+                self.subarray_sensors.extend(subarray_sensors)
             logger.info('Configuration updated')
         except:
             logger.warning('Configuration not updated; old configuration might be present.')
@@ -438,9 +453,15 @@ class BLKATPortalClient(object):
         """
         # Get cont update sensors
         sensors_for_update = []
+        # Antenna sensors:
         sensors_for_update.extend(self.gen_ant_sensor_list(product_id, self.ant_sensors))
+        # Stream sensors:
         cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
         sensors_for_update.extend(self.gen_stream_sensor_list(product_id, self.stream_sensors, cbf_prefix))
+        # Subarray sensors:
+        for sensor in self.subarray_sensors:
+            sensor = 'subarray_{}_{}'.format(product_id[-1], sensor)
+            sensors_for_update.append(sensor)
         # Start io_loop to listen to sensors whose values should be registered
         # immediately when they change.
         if(len(sensors_for_update) > 0):

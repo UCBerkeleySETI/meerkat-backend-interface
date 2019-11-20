@@ -38,7 +38,8 @@ cbf_sensors_on_configure:
 stream_sensors:
 - antenna_channelised_voltage_input_data_suspect
 
-
+array_sensors:
+- observation_activity
  
  
 
