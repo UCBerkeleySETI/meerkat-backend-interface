@@ -305,8 +305,9 @@ def stream_sensor_name(product_id, redis_server, sensor):
     Returns:
         stream_sensor (str): Full stream sensor name for querying via KATPortal.
     """
+    s_num = product_id[-1] # subarray number
     cbf_prefix = redis_server.get('{}:cbf_prefix'.format(product_id))
-    stream_sensor = 'subarray_{}_streams_{}_{}'.format(product_id[-1], cbf_prefix, sensor)
+    stream_sensor = '{}:subarray_{}_streams_{}_{}'.format(product_id, s_num, cbf_prefix, sensor)
     return stream_sensor
 
 def main(port, cfg_file):

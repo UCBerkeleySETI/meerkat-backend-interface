@@ -58,6 +58,7 @@ class BLKATPortalClient(object):
         self.ant_sensors = []  # sensors required from each antenna
         self.stream_sensors = []  # stream sensors (for continuous update)
         self.cbf_conf_sensors = []  # cbf sensors to be queried once-off on configure
+        self.stream_conf_sensors = [] # stream sensors for acquisition on configure.
         self.conf_sensors = [] # other sensors to be queried once-off on configure
         self.subarray_sensors = [] # subarray-level sensors
         self.cont_update_sensors = [] # will contain all sensors for continuous update
@@ -383,9 +384,9 @@ class BLKATPortalClient(object):
         key = '{}:{}'.format(product_id, 'cbf_name')
         write_pair_redis(self.redis_server, key, cbf_name)
         # Get CBF sensor values required on configure.
+        cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
         if(len(self.cbf_conf_sensors) > 0):
             # Complete the CBF sensor names with the CBF component name.
-            cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
             cbf_sensor_prefix = '{}_{}_'.format(cbf_name, cbf_prefix)
             cbf_conf_sensor_names = [cbf_sensor_prefix + sensor for sensor in self.cbf_conf_sensors]
             # Get CBF sensors and write to redis. 
@@ -652,7 +653,7 @@ class BLKATPortalClient(object):
 |                                                   |
 |                KATPortal Client                   |
 |                                                   |
-|                 Version: {}                       |
+|                 Version: {}                      |
 |                                                   |
 |  github.com/danielczech/meerkat-backend-interface |
 |  github.com/ejmichaud/meerkat-backend-interface   |
