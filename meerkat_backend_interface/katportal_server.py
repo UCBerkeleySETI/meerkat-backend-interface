@@ -23,26 +23,22 @@ from .redis_tools import (
 from .logger import log as logger
 
 class BLKATPortalClient(object):
-    """Our client server to the Katportal
+    """Client server to KATPortal. Once initialized, the client creates 
+    a Tornado ioloop and a connection to the local Redis server.
 
     Examples:
         >>> client = BLKATPortalClient()
         >>> client.start()
 
-    Yes, it's that simple. (but katportal_start does something a little fancier!)
-
-    Once initialized, the client creates a Tornado ioloop and
-    a connection to the local Redis server.
-
     When start() is called, a loop starts that subscribes to the 'alerts'
     channel of the Redis server. Depending on the message received, various
-    processes are run (asynchronously?). These include:
+    processes are run. These include:
         1. Creating a new KATPortalClient object specific to the
-            product id we just received in a ?configure request
+            product id just received in a ?configure request.
         2. Querying for schedule block information when ?capture-init is
-            received and publishing this to Redis
+            received and publishing this to Redis.
         3. Querying for target information when ?capture-start is
-            received and publishing this to Redis
+            received and publishing this to Redis.
         4. Deleting the corresponding KATPortalClient object when
             a ?deconfigure request is sent.
 
@@ -509,6 +505,9 @@ class BLKATPortalClient(object):
             logger.info("Deleted KATPortalClient instance for product_id: {}".format(product_id))
 
     def _capture_stop(self, product_id):
+        """Anything that needs to be completed when a capture-stop
+        message is received should go here.
+        """
         pass
 
     def _other(self, product_id):
@@ -551,10 +550,9 @@ class BLKATPortalClient(object):
         blocks = []
         for sb_id in sb_ids:
             # Should this be 'client' rather than 'portal_client'?
-            #block = yield portal_client.future_targets(sb_id)
+            # block = yield portal_client.future_targets(sb_id)
             block = yield client.future_targets(sb_id)
             blocks.append(block)
-        # TODO: do something interesting with schedule blocks
         raise tornado.gen.Return(blocks)
 
     @tornado.gen.coroutine
@@ -588,16 +586,15 @@ class BLKATPortalClient(object):
                 except SensorNotFoundError as exc:
                     print("\n", exc)
                     continue
-            # TODO: get more information using the client?
         raise tornado.gen.Return(sensors_and_values)
 
     def _convert_SensorSampleValueTime_to_dict(self, sensor_value):
         """Converts the named-tuple object returned by sensor_value
             query into a dictionary. This dictionary contains the following values:
-                - sample_time:  float
+                - timestamp:  float
                     The timestamp (UNIX epoch) the sample was received by CAM.
                     Timestamp value is reported with millisecond precision.
-                - value_time:  float
+                - value_timestamp:  float
                     The timestamp (UNIX epoch) the sample was read at the lowest level sensor.
                     value_timestamp value is reported with millisecond precision.
                 - value:  str
@@ -612,7 +609,7 @@ class BLKATPortalClient(object):
                 sensor_value (SensorSampleValueTime)
 
             Returns:
-                (dict)
+                sensor_value_dict (dict)
         """
         sensor_value_dict = dict()
         sensor_value_dict['timestamp'] = sensor_value.sample_time
@@ -623,27 +620,28 @@ class BLKATPortalClient(object):
 
     def _print_start_image(self):
         print(R"""
-       ________________________________
-      /                                "-_
-     /      .  |  .                       \
-    /      : \ | / :                       \
-   /        '-___-'                         \
-  /_________________________________________ \
-       _______| |________________________--""-L
-      /       F J                              \
-     /       F   J                              L
-    /      :'     ':                            F
-   /        '-___-'                            /
-  /_________________________________________--"
-+-------------------------------------------------+
-|                                                 |
-|              Breakthrough Listen's              |
-|                                                 |
-|                KATPortal Client                 |
-|                                                 |
-|                 Version: {}                    |
-|                                                 |
-|  github.com/ejmichaud/meerkat-backend-interface |
-|                                                 |
-+-------------------------------------------------+
+         ________________________________
+        /                                "-_
+       /      .  |  .                       \
+      /      : \ | / :                       \
+     /        '-___-'                         \
+    /_________________________________________ \
+         _______| |________________________--""-L
+        /       F J                              \
+       /       F   J                              L
+      /      :'     ':                            F
+     /        '-___-'                            /
+    /_________________________________________--"
++---------------------------------------------------+
+|                                                   |
+|              Breakthrough Listen's                |
+|                                                   |
+|                KATPortal Client                   |
+|                                                   |
+|                 Version: {}                       |
+|                                                   |
+|  github.com/danielczech/meerkat-backend-interface |
+|  github.com/ejmichaud/meerkat-backend-interface   |
+|                                                   |
++---------------------------------------------------+
 """.format(self.VERSION))

@@ -44,6 +44,18 @@ def get_pkt_idx(red_server, host_key):
     return pkt_idx
 
 def get_dwell_time(red_server, host_key):
+    """Get the current dwell time from the status buffer
+    stored in Redis for a particular host. 
+
+    Args:
+        red_server: Redis server. 
+        host_key (str): Key for Redis hash of status buffer
+        for a particular host.
+
+    Returns:
+        dwell_time (int): Dwell time (recording length) in
+        seconds.
+    """
     dwell_time = 0
     host_status = red_server.hgetall(host_key)
     if(len(host_status) > 0):
@@ -373,7 +385,6 @@ def main(port, cfg_file):
                 dwell_time = get_dwell_time(red, host_key)
                 pub_gateway_msg(red, global_chan, 'DWELL', '0', log)
                 pub_gateway_msg(red, global_chan, 'DWELL', dwell_time, log)
-
     except KeyboardInterrupt:
         log.info("Stopping coordinator")
         sys.exit(0)

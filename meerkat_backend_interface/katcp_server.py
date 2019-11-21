@@ -89,7 +89,7 @@ class BLBackendInterface(AsyncDeviceServer):
         """Start the server
 
         Based on the passed configuration object this is
-        where the clients for suboridnates nodes will be
+        where the clients for subordinate nodes will be
         set up.
         """
         super(BLBackendInterface, self).start()
@@ -107,7 +107,7 @@ class BLBackendInterface(AsyncDeviceServer):
                   |.| `. `-. | ||
                   :.|   `-. \ ';;
                    .- ,   \;;|
-                   ;   ,  |  ,\
+                   ;   ,  |  ,\       https://github.com/danielczech/meerkat-backend-interface
                    ; ,    ;    \      https://github.com/ejmichaud/meerkat-backend-interface
                   ;    , /`.  , )
                __,;,   ,'   \  ,|
