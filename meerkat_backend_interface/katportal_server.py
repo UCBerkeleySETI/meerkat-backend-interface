@@ -249,13 +249,14 @@ class BLKATPortalClient(object):
             for sensor in ant_sensors:
                 ant_sensor_list.append(ant + '_' + sensor)
         return ant_sensor_list
-
+ 
     def gen_stream_sensor_list(self, product_id, stream_sensors, cbf_name):
         """Automatically builds a list of stream sensor names.
 
         Args:
             product_id (str): The product id given in the ?configure request.
             stream_sensors (list): The stream sensors to be subscribed to.
+            cbf_name (str): full CBF prefix. 
 
         Returns:
             stream_sensor_list (list): the full sensor names.
@@ -281,7 +282,7 @@ class BLKATPortalClient(object):
                     cfg = yaml.safe_load(f)
                     return(cfg['sensors_per_antenna'], cfg['cbf_sensors_on_configure'],           
                     cfg['stream_sensors'], cfg['sensors_on_configure'],
-                    cfg['array_sensors'])
+                    cfg['array_sensors'], cfg['stream_sensors_on_configure'])
                 except yaml.YAMLError as E:
                     logger.error(E)
         except IOError:
@@ -338,13 +339,16 @@ class BLKATPortalClient(object):
         """
         # Update configuration:
         try:
-            ant_sensors, cbf_conf_sensors, stream_sensors, conf_sensors, subarray_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
+            ant_sensors, cbf_conf_sensors, stream_sensors, conf_sensors, subarray_sensors, stream_conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
             if(ant_sensors is not None):
                 self.ant_sensors = []
                 self.ant_sensors.extend(ant_sensors)
             if(cbf_conf_sensors is not None):
                 self.cbf_conf_sensors = []
                 self.cbf_conf_sensors.extend(cbf_conf_sensors)
+            if(stream_conf_sensors is not None):
+                self.stream_conf_sensors = []
+                self.stream_conf_sensors.extend(stream_conf_sensors)
             if(stream_sensors is not None):
                 self.stream_sensors = []
                 self.stream_sensors.extend(stream_sensors)
@@ -363,6 +367,7 @@ class BLKATPortalClient(object):
         self.subarray_katportals[product_id] = client
         logger.info("Created katportalclient object for : {}".format(product_id))
         subarray_nr = product_id[-1]
+        # Get sensors on configure
         if(len(self.conf_sensors) > 0):
             conf_sensor_names = ['subarray_{}_'.format(subarray_nr) + sensor for sensor in self.conf_sensors]
             sensors_and_values = self.io_loop.run_sync(
@@ -393,6 +398,15 @@ class BLKATPortalClient(object):
             antennas, feng_ids = self.antenna_mapping(product_id, cbf_sensor_prefix)
             write_pair_redis(self.redis_server, '{}:antenna_names'.format(product_id), antennas)
             write_pair_redis(self.redis_server, '{}:feng_ids'.format(product_id), feng_ids)
+        # Get stream sensors on configure:
+        if(len(self.stream_conf_sensors) > 0):
+            stream_conf_sensors = ['subarray_{}_streams_{}_{}'.format(subarray_nr, cbf_prefix, sensor) 
+                                  for sensor in self.stream_conf_sensors]
+            sensors_and_values = self.io_loop.run_sync(
+                lambda: self._get_sensor_values(product_id, stream_conf_sensors))
+            for sensor_name, details in sensors_and_values.items():
+                key = "{}:{}".format(product_id, sensor_name)
+                write_pair_redis(self.redis_server, key, details['value'])
         # Indicate to anyone listening that the configure process is complete. 
         publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 'conf_complete:{}'.format(product_id))
 

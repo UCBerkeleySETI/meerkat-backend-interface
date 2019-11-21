@@ -293,6 +293,22 @@ def cbf_sensor_name(product_id, redis_server, sensor):
     cbf_sensor = cbf_sensor_prefix + sensor
     return cbf_sensor
 
+def stream_sensor_name(product_id, redis_server, sensor):
+    """Builds the full name of a stream sensor according to the 
+    CAM convention.  
+
+    Args:
+        product_id (str): Name of the current active subarray.
+        redis_server: Redis server.
+        sensor (str): Short sensor name (from the .yml config file).
+
+    Returns:
+        stream_sensor (str): Full stream sensor name for querying via KATPortal.
+    """
+    cbf_prefix = redis_server.get('{}:cbf_prefix'.format(product_id))
+    stream_sensor = 'subarray_{}_streams_{}_{}'.format(product_id[-1], cbf_prefix, sensor)
+    return stream_sensor
+
 def main(port, cfg_file):
     #Refactor this in future.
     log = set_logger(log_level = logging.DEBUG)
@@ -350,6 +366,10 @@ def main(port, cfg_file):
                 adc_per_spectra = red.get(sensor_key)
                 adc_per_heap = int(adc_per_spectra)*int(spectra_per_heap)
                 pub_gateway_msg(red, global_chan, 'HCLOCKS', adc_per_heap, log)
+                # Centre frequency
+                sensor_key = stream_sensor_name(product_id, red, 'antenna_channelised_voltage_centre_frequency')
+                centre_freq = red.get(sensor_key)
+                pub_gateway_msg(red, global_chan, 'CENTFREQ', centre_freq, log)
                 # Coarse channel bandwidth (from F engines)
                 # Note: no sign information!  
                 sensor_key = cbf_sensor_name(product_id, red, 'adc_sample_rate')
