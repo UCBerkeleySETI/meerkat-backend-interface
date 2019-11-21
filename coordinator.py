@@ -370,7 +370,7 @@ def main(port, cfg_file):
                 # Centre frequency
                 sensor_key = stream_sensor_name(product_id, red, 'antenna_channelised_voltage_centre_frequency')
                 centre_freq = red.get(sensor_key)
-                pub_gateway_msg(red, global_chan, 'CENTFREQ', centre_freq, log)
+                pub_gateway_msg(red, global_chan, 'FECENTER', centre_freq, log)
                 # Coarse channel bandwidth (from F engines)
                 # Note: no sign information!  
                 sensor_key = cbf_sensor_name(product_id, red, 'adc_sample_rate')
