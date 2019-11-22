@@ -255,7 +255,7 @@ def configure(cfg_file):
     except IOError:
         log.error('Config file not found')
 
-def pub_gateway_msg(red_server, chan_name, msg_name, msg_val, logger):
+def pub_gateway_msg(red_server, chan_name, msg_name, msg_val, logger, write):
     """Format and publish a hashpipe-Redis gateway message. Save messages
     in a Redis hash for later use by reconfig tool. 
 
@@ -265,6 +265,7 @@ def pub_gateway_msg(red_server, chan_name, msg_name, msg_val, logger):
         msg_name (str): Name of key in status buffer.
         msg_val (str): Value associated with key.
         logger: Logger. 
+        write (bool): If true, also write message to Redis database.
 
     Returns:
         None
@@ -272,7 +273,9 @@ def pub_gateway_msg(red_server, chan_name, msg_name, msg_val, logger):
     msg = '{}={}'.format(msg_name, msg_val)
     red_server.publish(chan_name, msg)
     # save hash of most recent messages
-    red_server.hset(chan_name, msg_name, msg_val)
+    if(write):
+        red_server.hset(chan_name, msg_name, msg_val)
+        logger.info('Wrote {} for channel {} to Redis'.format(msg, chan_name))
     logger.info('Published {} to channel {}'.format(msg, chan_name))
 
 def cbf_sensor_name(product_id, redis_server, sensor):
@@ -342,35 +345,35 @@ def main(port, cfg_file):
                 # Number of antennas
                 ant_key = '{}:antennas'.format(product_id)
                 n_ants = len(red.lrange(ant_key, 0, red.llen(ant_key)))
-                pub_gateway_msg(red, global_chan, 'NANTS', n_ants, log)
+                pub_gateway_msg(red, global_chan, 'NANTS', n_ants, log, True)
                 # Sync time (UNIX, seconds)
                 sensor_key = cbf_sensor_name(product_id, red, 'sync_time')   
                 sync_time = int(float(red.get(sensor_key))) # Is there a cleaner way to achieve this casting?
-                pub_gateway_msg(red, global_chan, 'SYNCTIME', sync_time, log)
+                pub_gateway_msg(red, global_chan, 'SYNCTIME', sync_time, log, True)
                 # Port
-                pub_gateway_msg(red, global_chan, 'BINDPORT', port, log)
+                pub_gateway_msg(red, global_chan, 'BINDPORT', port, log, True)
                 # Total number of streams
-                pub_gateway_msg(red, global_chan, 'FENSTRM', n_addrs, log)
+                pub_gateway_msg(red, global_chan, 'FENSTRM', n_addrs, log, True)
                 # Total number of frequency channels    
                 n_freq_chans = red.get('{}:n_channels'.format(product_id))
-                pub_gateway_msg(red, global_chan, 'FENCHAN', n_freq_chans, log)
+                pub_gateway_msg(red, global_chan, 'FENCHAN', n_freq_chans, log, True)
                 # Number of channels per substream
                 sensor_key = cbf_sensor_name(product_id, red, 'antenna_channelised_voltage_n_chans_per_substream')   
                 n_chans_per_substream = red.get(sensor_key)
-                pub_gateway_msg(red, global_chan, 'HNCHAN', n_chans_per_substream, log)
+                pub_gateway_msg(red, global_chan, 'HNCHAN', n_chans_per_substream, log, True)
                 # Number of spectra per heap
                 sensor_key = cbf_sensor_name(product_id, red, 'tied_array_channelised_voltage_0x_spectra_per_heap')   
                 spectra_per_heap = red.get(sensor_key)
-                pub_gateway_msg(red, global_chan, 'HNTIME', spectra_per_heap, log)
+                pub_gateway_msg(red, global_chan, 'HNTIME', spectra_per_heap, log, True)
                 # Number of ADC samples per heap
                 sensor_key = cbf_sensor_name(product_id, red, 'antenna_channelised_voltage_n_samples_between_spectra')   
                 adc_per_spectra = red.get(sensor_key)
                 adc_per_heap = int(adc_per_spectra)*int(spectra_per_heap)
-                pub_gateway_msg(red, global_chan, 'HCLOCKS', adc_per_heap, log)
+                pub_gateway_msg(red, global_chan, 'HCLOCKS', adc_per_heap, log, True)
                 # Centre frequency
                 sensor_key = stream_sensor_name(product_id, red, 'antenna_channelised_voltage_centre_frequency')
                 centre_freq = red.get(sensor_key)
-                pub_gateway_msg(red, global_chan, 'FECENTER', centre_freq, log)
+                pub_gateway_msg(red, global_chan, 'FECENTER', centre_freq, log, True)
                 # Coarse channel bandwidth (from F engines)
                 # Note: no sign information!  
                 sensor_key = cbf_sensor_name(product_id, red, 'adc_sample_rate')
@@ -378,34 +381,34 @@ def main(port, cfg_file):
                 # Default to negative for now.
                 coarse_chan_bw = -1*float(adc_sample_rate)/2.0/int(n_freq_chans)/1e6
                 coarse_chan_bw = '{0:.17g}'.format(coarse_chan_bw)
-                pub_gateway_msg(red, global_chan, 'CHAN_BW', coarse_chan_bw, log) 
+                pub_gateway_msg(red, global_chan, 'CHAN_BW', coarse_chan_bw, log, True) 
                 for i in range(n_red_chans):
                     local_chan = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
                     # Number of streams for instance i
                     n_streams_per_instance = int(addr_list[i][-1])+1
-                    pub_gateway_msg(red, local_chan, 'NSTRM', n_streams_per_instance, log)
+                    pub_gateway_msg(red, local_chan, 'NSTRM', n_streams_per_instance, log, True)
                     # Absolute starting channel for instance i
                     s_chan = i*n_streams_per_instance*int(n_chans_per_substream)
-                    pub_gateway_msg(red, local_chan, 'SCHAN', s_chan, log)
+                    pub_gateway_msg(red, local_chan, 'SCHAN', s_chan, log, True)
                     # Destination IP addresses for instance i
-                    pub_gateway_msg(red, local_chan, 'DESTIP', addr_list[i], log)
+                    pub_gateway_msg(red, local_chan, 'DESTIP', addr_list[i], log, True)
             if msg_type == 'deconfigure':
-                pub_gateway_msg(red, global_chan, 'DESTIP', '0.0.0.0', log)
+                pub_gateway_msg(red, global_chan, 'DESTIP', '0.0.0.0', log, False)
                 log.info('Subarray deconfigured')
             if msg_type == 'data-suspect':
                 mask = msg_parts[2]
                 bitmask = hex(int(mask, 2))
-                pub_gateway_msg(red, global_chan, 'FESTATUS', bitmask, log)
+                pub_gateway_msg(red, global_chan, 'FESTATUS', bitmask, log, False)
             if msg_type == 'tracking':
                 pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
-                pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log) 
+                pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log, False) 
             if msg_type == 'not-tracking':
                 # For the moment during testing, get dwell time from one of the hosts.
                 # Then set to zero and then back to to the original dwell time.
                 host_key = '{}://{}/status'.format(HPGDOMAIN, hashpipe_instances[2])
                 dwell_time = get_dwell_time(red, host_key)
-                pub_gateway_msg(red, global_chan, 'DWELL', '0', log)
-                pub_gateway_msg(red, global_chan, 'DWELL', dwell_time, log)
+                pub_gateway_msg(red, global_chan, 'DWELL', '0', log, False)
+                pub_gateway_msg(red, global_chan, 'DWELL', dwell_time, log, False)
     except KeyboardInterrupt:
         log.info("Stopping coordinator")
         sys.exit(0)
