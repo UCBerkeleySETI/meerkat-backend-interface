@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import time
 from optparse import OptionParser
 import yaml
 import json
@@ -315,6 +316,7 @@ def stream_sensor_name(product_id, redis_server, sensor):
 
 def main(port, cfg_file):
     #Refactor this in future.
+    tracking = 0 # Store tracking state during developement
     log = set_logger(log_level = logging.DEBUG)
     log.info("Starting Coordinator")
     try:
@@ -404,15 +406,21 @@ def main(port, cfg_file):
                 bitmask = '#{:x}'.format(int(mask, 2))
                 pub_gateway_msg(red, global_chan, 'FESTATUS', bitmask, log, False)
             if msg_type == 'tracking':
-                pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
-                pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log, False) 
+                if(tracking == 0):
+                    pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
+                    pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log, False)
+                tracking = 1 
             if msg_type == 'not-tracking':
-                # For the moment during testing, get dwell time from one of the hosts.
-                # Then set to zero and then back to to the original dwell time.
-                host_key = '{}://{}/status'.format(HPGDOMAIN, hashpipe_instances[2])
-                dwell_time = get_dwell_time(red, host_key)
-                pub_gateway_msg(red, global_chan, 'DWELL', '0', log, False)
-                pub_gateway_msg(red, global_chan, 'DWELL', dwell_time, log, False)
+                if(tracking == 1):
+                    # For the moment during testing, get dwell time from one of the hosts.
+                    # Then set to zero and then back to to the original dwell time.
+                    host_key = '{}://{}/status'.format(HPGDOMAIN, hashpipe_instances[2])
+                    dwell_time = get_dwell_time(red, host_key)
+                    pub_gateway_msg(red, global_chan, 'DWELL', '0', log, False)
+                    pub_gateway_msg(red, global_chan, 'PKTSTART', '0', log, False)
+                    time.sleep(1) # Wait for processing nodes.
+                    pub_gateway_msg(red, global_chan, 'DWELL', dwell_time, log, False)
+                tracking = 0
     except KeyboardInterrupt:
         log.info("Stopping coordinator")
         sys.exit(0)
