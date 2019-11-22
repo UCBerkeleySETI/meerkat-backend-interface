@@ -373,6 +373,8 @@ def main(port, cfg_file):
                 # Centre frequency
                 sensor_key = stream_sensor_name(product_id, red, 'antenna_channelised_voltage_centre_frequency')
                 centre_freq = red.get(sensor_key)
+                centre_freq = float(centre_freq)/1e6
+                centre_freq = '{0:.17g}'.format(centre_freq)
                 pub_gateway_msg(red, global_chan, 'FECENTER', centre_freq, log, True)
                 # Coarse channel bandwidth (from F engines)
                 # Note: no sign information!  
@@ -382,6 +384,8 @@ def main(port, cfg_file):
                 coarse_chan_bw = -1*float(adc_sample_rate)/2.0/int(n_freq_chans)/1e6
                 coarse_chan_bw = '{0:.17g}'.format(coarse_chan_bw)
                 pub_gateway_msg(red, global_chan, 'CHAN_BW', coarse_chan_bw, log, True) 
+                # Set PKTSTART to 0 on configure
+                pub_gateway_msg(red, global_chan, 'PKTSTART', 0, log, True) 
                 for i in range(n_red_chans):
                     local_chan = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
                     # Number of streams for instance i
@@ -397,7 +401,7 @@ def main(port, cfg_file):
                 log.info('Subarray deconfigured')
             if msg_type == 'data-suspect':
                 mask = msg_parts[2]
-                bitmask = hex(int(mask, 2))
+                bitmask = '#{:x}'.format(int(mask, 2))
                 pub_gateway_msg(red, global_chan, 'FESTATUS', bitmask, log, False)
             if msg_type == 'tracking':
                 pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
