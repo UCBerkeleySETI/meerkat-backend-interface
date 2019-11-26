@@ -59,33 +59,40 @@ The dict may contain:
 
 These sensor values are acquired via `katportalclient`. Note that for certain sensors, websocket subscriptions are made at particular stages of an observation. After a websocket subscription has been made, the stored values for these sensors are updated asynchronously whenever they change.
 
-| Key                                                                                                  | Type  | Description                                                                                        | Created By          | Stage Created                            |
-|:-----------------------------------------------------------------------------------------------------|:------|:---------------------------------------------------------------------------------------------------|:--------------------|:-----------------------------------------|
-| `[product_id]:[antenna]_marked_faulty`                                                               | str   | True if an antenna has been manually marked as faulty.                                             | `katportal_server`  | Websocket subscription on `capture-init` |
-| `[product_id]:[antenna]_data_suspect`                                                                | str   | Only False if all sensors indicate data is trustworthy. Eg will be True if slewing or off target.  | `katportal_server`  | Websocket subscription on `capture-init` |
-| `[product_id]:[antenna]_target`                                                                      | str   | Requested target (description and RA, Dec)                                                         | `katportal_server`  | Websocket subscription on `capture-init` |
-| `[product_id]:subarray_[subarray_num]_pool_resources`                                                | str   | List of components included in subarray (Eg `[bluse_1, m001, m002, m012, cbf_1, sdp_1]`)           | `katportal_server`  | `configure`                              |
-| `[product_id]:cbf_[subarray_num]_[cbf_prefix] _antenna_channelised_voltage_n_chans_per_substream`     | str   | Number of channels per SPEAD2 substream.                                                           | `katportal_server`  | `configure`                              |
-| `[product_id]:cbf_[subarray_num]_[cbf_prefix] _tied_array_channelised_voltage_0x_spectra_per_heap`    | str   | Number of spectra per SPEAD2 heap.                                                                 | `katportal_server`  | `configure`                              |
-| `[product_id]:cbf_[subarray_num]_[cbf_prefix]_sync_time`                                             | str   | Supplied UNIX synchronisation time (from CBF).                                                     | `katportal_server`  | `configure`                              |
-| `[product_id]:cbf_[subarray_num]_[cbf_prefix] _antenna_channelised_voltage_n_samples_between_spectra` | str   | Number of samples from which each spectra is generated.                                            | `katportal_server`  | `configure`                              |
-| `[product_id]:schedule_blocks`                                                                       | str   | List of approved schedule blocks for the current subarray.                                         | `katportal_server`  | `capture-init`                           |
+| Key                                                                                                         | Type  | Description                                                                               | Created By          | Stage Created                    |
+|:------------------------------------------------------------------------------------------------------------|:------|:------------------------------------------------------------------------------------------|:--------------------|:---------------------------------|
+| `[product_id]:[antenna]_target`                                                                             | str   | Requested target (description and RA, Dec)                                                | `katportal_server`  | Subscription on `capture-init`   |
+| `[product_id]:subarray_[subarray_num]_pool_resources`                                                       | str   | List of components included in subarray (Eg `[bluse_1, m001, m002, m012, cbf_1, sdp_1]`)  | `katportal_server`  | `configure`                      |
+| `[product_id]:subarray_[subarray_num]_observation_activity`                                                 | str   | Status of observation (slew, track, etc).                                                 | `katportal_server`  | Subscription on `capture-start`  |
+| `[product_id]:[cbf_name]_[subarray_num]_[cbf_prefix] _antenna_channelised_voltage_n_chans_per_substream`    | str   | Number of channels per SPEAD2 substream.                                                  | `katportal_server`  | `configure`                      |
+| `[product_id]:[cbf_name]_[subarray_num]_[cbf_prefix] _tied_array_channelised_voltage_0x_spectra_per_heap`   | str   | Number of spectra per SPEAD2 heap.                                                        | `katportal_server`  | `configure`                      |
+| `[product_id]:[cbf_name]_[subarray_num]_[cbf_prefix]_sync_time`                                             | str   | Supplied UNIX synchronisation time (from CBF).                                            | `katportal_server`  | `configure`                      |
+| `[product_id]:[cbf_name]_[subarray_num]_[cbf_prefix] _antenna_channelised_voltage_n_samples_between_spectra`| str   | Number of samples from which each spectra is generated.                                   | `katportal_server`  | `configure`                      |
+| `[product_id]:schedule_blocks`                                                                              | str   | List of approved schedule blocks for the current subarray.                                | `katportal_server`  | `capture-init`                   |
+| `[product_id]:subarray_[subarray_num]_[cbf_prefix]_antenna_channelised_voltage_centre_frequency`            | str   | Observation centre frequency.                                                             | `katportal_server`  | `configure`                      |
+| `[product_id]:subarray_[subarray_num]_[cbf_prefix]_antenna_channelised_voltage_input_data_suspect`          | str   | Data-suspect mask for each F-engine, both pols.                                           | `katportal_server`  | Subscription on `capture-start`  |
+| `[product_id]:[cbf_name]]_[cbf_prefix]_input_labelling`                                                     | str   | Mapping from antenna name to F-engine ID.                                                 | `katportal_server`  | `configure`                      |
+
+
 
 # Messages
 
 ## Internal Channels: `alerts` and `sensor_alerts`
 
-| Message                             | Description                                                                                      | Channel         | Publisher(s)       | Subscriber(s)                      |
+| Message                             | Description                                                                                        | Channel         | Publisher(s)       | Subscriber(s)                      |
 |:------------------------------------|:---------------------------------------------------------------------------------------------------|:----------------|:-------------------|:-----------------------------------|
 | `configure:[product_id]`            | Published when a configure request is received, indicating that a subarray has been built.         | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
-| `conf_complete:[product_id]`        | Published once all sensor values required at subarray configuration time have been acquired        | `alerts`        | `katportal_server` | `katportal_server`, `coordinator`  |
+| `conf_complete:[product_id]`        | Published once all sensor values required at subarray configuration time have been acquired        | `alerts`        | `katportal_server` | `coordinator`                      |
 | `capture-init:[product_id]`         | Published when a capture-init request is received, indicating that a program block is starting.    | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
 | `capture-start:[product_id]`        | Published when a capture-start request is received, indicating the start of an observation.        | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
 | `capture-stop:[product_id]`         | Published when a capture-stop request is received, indicating the end of an observation.           | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
 | `capture-done:[product_id]`         | Published when a capture-done request is received, indicating the end of a program block.          | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
 | `deconfigure:[product_id]`          | Published when a deconfigure request is received, indicating that a subarray has been broken down. | `alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
-| `[product_id]:data_suspect:[value]` | Value of `data-suspect` for the full subarray (`False` if all antennas report `False`.             | `sensor_alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
-| `[product_id]:target:[value]`       | Current target under observation.                                                                  | `sensor_alerts`        | `katcp_server`     | `katportal_server`, `coordinator`  |
+| `[product_id]:data_suspect:[mask]`  | Binary mask indicating data-suspect for each polarisation of each F-engine. 1 = data is suspect.   | `sensor_alerts` | `katportal_server` | `coordinator`                      |
+| `[product_id]:target:[value]`       | Current target under observation.                                                                  | `sensor_alerts` | `katportal_server` | `coordinator`                      |
+| `tracking:[product_id]`             | Published when the subarray begins tracking a target.                                              | `sensor_alerts` | `katportal_server` | `coordinator`                      |
+| `not-tracking:[product_id]`         | Published when the subarray ceases to track a target.                                              | `sensor_alerts` | `katportal_server` | `coordinator`                      |
+
 
 ## Hashpipe-Redis Gateway
 
@@ -108,5 +115,7 @@ SPEAD stream addresses are published along with other information to individual 
 | `NANTS=[num antennas]`            | Number of antennas in the subarray.                                                              | `[HPGDOMAIN]:///set`                    |
 | `CHAN_BW=[channel bandwidth]`     | Bandwidth of a single F-engine frequency channel (coarse channel).                               | `[HPGDOMAIN]:///set`                    |
 | `PKTSTART=[starting packet index]`| Index of the first packet from which to record (to ensure a synchronised start across instances).| `[HPGDOMAIN]:///set`                    |
-
+| `FESTATUS=[data-suspect bitmask]` | Hex mask indicating data suspect for each polarisation from each F-eng. 1 = data is suspect.  | `[HPGDOMAIN]:///set`                    |
+| `FECENTER=[centre frequency]`     | On-sky observation centre frequency.                                                             | `[HPGDOMAIN]:///set`                    |
+| `DWELL=[dwell time]`              | Duration of recording. Can also be used to halt a recording.                                     | `[HPGDOMAIN]:///set`                    |
 
