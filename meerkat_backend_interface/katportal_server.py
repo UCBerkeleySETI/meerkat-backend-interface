@@ -225,9 +225,13 @@ class BLKATPortalClient(object):
                 if(len(value)>0):
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, 
                     '{}:{}:{}'.format(product_id, sensor_name, value))
+                    key = '{}:{}'.format(product_id, sensor_name)
+                    write_pair_redis(self.redis_server, key, value)
                 else:
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, 
                     '{}:{}:unavailable'.format(product_id, sensor_name))
+            else:
+                logger.warning("Antennas do not show consensus for sensor: {}".format(sensor_name))
         except:
             # If any of the sensors are not available:
             publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:unavailable'.format(product_id, sensor_name))

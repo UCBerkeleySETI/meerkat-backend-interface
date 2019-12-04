@@ -315,7 +315,9 @@ def stream_sensor_name(product_id, redis_server, sensor):
     return stream_sensor
 
 def main(port, cfg_file):
-    #Refactor this in future.
+    # Refactor this in future.
+    # For further information on the Hashpipe-Redis gateway messages, please see
+    # appendix B in https://arxiv.org/pdf/1906.07391.pdf
     tracking = 0 # Store tracking state during developement
     log = set_logger(log_level = logging.DEBUG)
     log.info("Starting Coordinator")
@@ -407,8 +409,16 @@ def main(port, cfg_file):
                 pub_gateway_msg(red, global_chan, 'FESTATUS', bitmask, log, False)
             if msg_type == 'tracking':
                 if(tracking == 0):
+                    # Set PKTSTART
                     pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
                     pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log, False)
+                    # Pointing information for the current target
+                    target = red.get('{}:target'.format(product_id))
+                    target = target.split(',')
+                    ra = target[2].strip()
+                    dec = target[3].strip()
+                    pub_gateway_msg(red, global_chan, 'RA_STR', ra, log, False)
+                    pub_gateway_msg(red, global_chan, 'DEC_STR', dec, log, False)
                 tracking = 1 
             if msg_type == 'not-tracking':
                 if(tracking == 1):
