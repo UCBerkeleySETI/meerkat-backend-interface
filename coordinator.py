@@ -415,8 +415,8 @@ def main(port, cfg_file):
                     # Pointing information for the current target
                     target = red.get('{}:target'.format(product_id))
                     target = target.split(',')
-                    ra = target[2].strip()
-                    dec = target[3].strip()
+                    ra = target[-2].strip()
+                    dec = target[-1].strip()
                     pub_gateway_msg(red, global_chan, 'RA_STR', ra, log, False)
                     pub_gateway_msg(red, global_chan, 'DEC_STR', dec, log, False)
                 tracking = 1 
