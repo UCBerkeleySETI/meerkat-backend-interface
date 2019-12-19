@@ -75,7 +75,7 @@ class BLKATPortalClient(object):
             'conf_complete' : self._conf_complete
         }
         return MSG_TO_FUNCTION_DICT.get(msg_type, self._other)
-
+    
     def start(self):
         self.p.subscribe(REDIS_CHANNELS.alerts)
         self._print_start_image()
@@ -130,8 +130,11 @@ class BLKATPortalClient(object):
                     else:
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
-                        '{}:{}'.format('not-tracking', product_id))      
-
+                        '{}:{}'.format('not-tracking', product_id))
+                    # Temporary solution for websocket subscription issue
+                    if(sensor_value == 'stop'):      
+                        self.io_loop.stop()
+                        
     def subarray_data_suspect(self, product_id):
         """Publish a global subarray data-suspect value by checking each
         individual antenna. If any antennas are marked faulty by an operator, 
@@ -480,8 +483,9 @@ class BLKATPortalClient(object):
         # Start io_loop to listen to sensors whose values should be registered
         # immediately when they change.
         if(len(sensors_for_update) > 0):
-            self.io_loop.add_callback(lambda: self.subscribe_sensors(product_id, sensors_for_update))
-            self.io_loop.start()
+            loop = tornado.ioloop.IOLoop.current()
+            loop.add_callback(lambda: self.subscribe_sensors(product_id, sensors_for_update))
+            loop.start()
 
     def _capture_done(self, product_id):
         """Responds to capture-done request
@@ -492,8 +496,8 @@ class BLKATPortalClient(object):
         Returns:
             None, but does many things!
         """
-        # Stop io_loop for async_sensor_list
-        self.io_loop.stop()
+        # In future, will stop io_loop here instead
+        # self.io_loop.stop()
         # Once-off sensors to query on ?capture_done
         sensors_to_query = []  # TODO: add sensors to query on ?capture_done
         sensors_and_values = self.io_loop.run_sync(
@@ -596,7 +600,6 @@ class BLKATPortalClient(object):
         sensor_names = yield client.sensor_names(targets)
         if not sensor_names:
             logger.warning("No matching sensors found!")
-            logger.info(targets)
         else:
             for sensor_name in sensor_names:
                 try:
