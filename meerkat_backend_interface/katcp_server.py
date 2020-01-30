@@ -35,10 +35,9 @@ import json
 import time
 from katcp import Sensor, AsyncDeviceServer, AsyncReply
 from katcp.kattypes import request, return_reply, Int, Str
-from reynard.utils import unpack_dict
 
 import redis
-from redis_tools import REDIS_CHANNELS, write_pair_redis, write_list_redis, publish_to_redis
+from .redis_tools import REDIS_CHANNELS, write_pair_redis, write_list_redis, publish_to_redis
 
 # to handle halt request
 from concurrent.futures import Future
@@ -46,6 +45,7 @@ from tornado import gen
 from tornado.concurrent import chain_future
 
 from .logger import log
+from .reynard_utils_p3 import unpack_dict
 
 
 class BLBackendInterface(AsyncDeviceServer):

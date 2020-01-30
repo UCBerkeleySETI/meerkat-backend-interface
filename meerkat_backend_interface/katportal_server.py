@@ -151,16 +151,16 @@ class BLKATPortalClient(object):
         ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))          
         ant_status = []
         try:
-	    for i in range(len(ant_list)):
+            for i in range(len(ant_list)):
                 data_suspect = ast.literal_eval(self.redis_server.get('{}:{}_data_suspect'.format(product_id, ant_list[i])))
                 marked_faulty_key = '{}:{}_marked_faulty'.format(product_id, ant_list[i])
                 marked_faulty = ast.literal_eval(self.redis_server.get(marked_faulty_key))
                 if(data_suspect & marked_faulty):
                     # If an antenna is marked faulty while subarray built, allow it and log. 
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, marked_faulty_key)
-	            ant_status.append(False) # Note that if marked_faulty is True, data_suspect is by definition True. 
+                    ant_status.append(False) # Note that if marked_faulty is True, data_suspect is by definition True. 
                 else:
-	            ant_status.append(data_suspect)
+                    ant_status.append(data_suspect)
             if(sum(ant_status) == 0): # all antennas show good data
 	            publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:data_suspect:{}'.format(product_id, False))
             else: 

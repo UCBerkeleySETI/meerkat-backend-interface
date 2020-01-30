@@ -227,7 +227,7 @@ def cli():
     """
     usage = "usage: %prog [options]"
     parser = OptionParser(usage=usage)
-    parser.add_option('-p', '--port', dest='port', type=long,
+    parser.add_option('-p', '--port', dest='port', type=int,
                       help='Redis port to connect to', default=6379)
     parser.add_option('-c', '--config', dest='cfg_file', type=str,
                       help='Config filename (yaml)', default = 'config.yml')
