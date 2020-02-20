@@ -297,10 +297,12 @@ class BLKATPortalClient(object):
             logger.error('Config file not found')
 
     @tornado.gen.coroutine
-    def subscribe_sensors(self, product_id, sensor_list):
-        """Subscribes to each sensor listed for asynchronous updates.
+    def subscription(self, sub, product_id, sensor_list):
+        """Subscribes or unsubscribes to each sensor listed for asynchronous 
+           updates.
         
         Args:
+            sub (str): Subscribe or unsubscribe. 
             sensor_list (list): Full names of sensors to subscribe to.
             product_id (str): The product ID given in the ?configure request.
 
@@ -309,9 +311,12 @@ class BLKATPortalClient(object):
         """
         yield self.subarray_katportals[product_id].connect()
         namespace = 'namespace_' + str(uuid.uuid4())
-        result = yield self.subarray_katportals[product_id].subscribe(namespace)
-        for sensor in sensor_list:
-            result = yield self.subarray_katportals[product_id].set_sampling_strategies(namespace, sensor, 'event')
+        if(sub == 'subscribe'):
+            result = yield self.subarray_katportals[product_id].subscribe(namespace)
+            for sensor in sensor_list:
+                result = yield self.subarray_katportals[product_id].set_sampling_strategies(namespace, sensor, 'event')
+        elif(sub == 'unsubscribe'):
+            result = yield self.subarray_katportals[product_id].unsubscribe(namespace)
 
     def component_name(self, short_name, pool_resources, log):
         """Determine the full name of a subarray component. 
@@ -484,7 +489,7 @@ class BLKATPortalClient(object):
         # immediately when they change.
         if(len(sensors_for_update) > 0):
             loop = tornado.ioloop.IOLoop.current()
-            loop.add_callback(lambda: self.subscribe_sensors(product_id, sensors_for_update))
+            loop.add_callback(lambda: self.subscription('subscribe', product_id, sensors_for_update))
             loop.start()
 
     def _capture_done(self, product_id):
@@ -528,11 +533,29 @@ class BLKATPortalClient(object):
             logger.info("Deleted KATPortalClient instance for product_id: {}".format(product_id))
 
     def _capture_stop(self, product_id):
-        """Anything that needs to be completed when a capture-stop
-        message is received should go here.
-        """
-        pass
+        """Responds to capture-stop request
 
+        Args:
+            product_id (str): the product id given in the ?configure request
+
+        Returns:
+            None
+        """
+        # Get cont update sensors
+        sensors_for_update = []
+        # Antenna sensors:
+        sensors_for_update.extend(self.gen_ant_sensor_list(product_id, self.ant_sensors))
+        # Stream sensors:
+        cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
+        sensors_for_update.extend(self.gen_stream_sensor_list(product_id, self.stream_sensors, cbf_prefix))
+        # Subarray sensors:
+        for sensor in self.subarray_sensors:
+            sensor = 'subarray_{}_{}'.format(product_id[-1], sensor)
+            sensors_for_update.append(sensor)
+        # Unsubscribe from all cont update sensors acquired above.
+        if(len(sensors_for_update) > 0):
+            self.subscription('unsubscribe', product_id, sensors_for_update)
+            
     def _other(self, product_id):
         """This is called when an unrecognized request is sent
 
