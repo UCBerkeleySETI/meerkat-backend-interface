@@ -53,7 +53,7 @@ class BLKATPortalClient(object):
         self.redis_server = redis.StrictRedis()
         self.p = self.redis_server.pubsub(ignore_subscribe_messages=True)
         self.io_loop = io_loop = tornado.ioloop.IOLoop.current()
-        self.subarray_katportals = dict()  # indexed by product id's
+        self.subarray_katportals = dict()  # indexed by product IDs
         self.config_file = config_file
         self.ant_sensors = []  # sensors required from each antenna
         self.stream_sensors = []  # stream sensors (for continuous update)
@@ -119,10 +119,10 @@ class BLKATPortalClient(object):
                         REDIS_CHANNELS.sensor_alerts, 
                         '{}:{}:{}'.format('data-suspect', product_id, sensor_value))
                 # Target information for publication
-                if('target' in sensor_name):
+                elif('target' in sensor_name):
                     self.antenna_consensus(product_id, 'target')
                 # Observation state for publication
-                if('activity' in sensor_name):
+                elif('activity' in sensor_name):
                     if(sensor_value == 'track'):
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
@@ -132,7 +132,11 @@ class BLKATPortalClient(object):
                         REDIS_CHANNELS.sensor_alerts, 
                         '{}:{}'.format('not-tracking', product_id))
                     # Temporary solution for websocket subscription issue
-                    if(sensor_value == 'stop'):      
+                    if(sensor_value == 'stop'):
+                        sensors_for_update = self.build_sub_sensors(product_id)
+                        logger.info(sensors_for_update)
+                        if(len(sensors_for_update) > 0):
+                            self.subscription('unsubscribe', product_id, sensors_for_update)
                         self.io_loop.stop()
                         
     def subarray_data_suspect(self, product_id):
@@ -310,13 +314,12 @@ class BLKATPortalClient(object):
             None
         """
         yield self.subarray_katportals[product_id].connect()
-        namespace = 'namespace_' + str(uuid.uuid4())
         if(sub == 'subscribe'):
-            result = yield self.subarray_katportals[product_id].subscribe(namespace)
+            result = yield self.subarray_katportals[product_id].subscribe(namespace = product_id) 
             for sensor in sensor_list:
-                result = yield self.subarray_katportals[product_id].set_sampling_strategies(namespace, sensor, 'event')
+                result = yield self.subarray_katportals[product_id].set_sampling_strategies(namespace = product_id, sensor, 'event')
         elif(sub == 'unsubscribe'):
-            result = yield self.subarray_katportals[product_id].unsubscribe(namespace)
+            result = yield self.subarray_katportals[product_id].unsubscribe(namespace = product_id)
 
     def component_name(self, short_name, pool_resources, log):
         """Determine the full name of a subarray component. 
@@ -474,17 +477,7 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        # Get cont update sensors
-        sensors_for_update = []
-        # Antenna sensors:
-        sensors_for_update.extend(self.gen_ant_sensor_list(product_id, self.ant_sensors))
-        # Stream sensors:
-        cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
-        sensors_for_update.extend(self.gen_stream_sensor_list(product_id, self.stream_sensors, cbf_prefix))
-        # Subarray sensors:
-        for sensor in self.subarray_sensors:
-            sensor = 'subarray_{}_{}'.format(product_id[-1], sensor)
-            sensors_for_update.append(sensor)
+        sensors_for_update = self.build_sub_sensors(product_id)
         # Start io_loop to listen to sensors whose values should be registered
         # immediately when they change.
         if(len(sensors_for_update) > 0):
@@ -501,8 +494,6 @@ class BLKATPortalClient(object):
         Returns:
             None, but does many things!
         """
-        # In future, will stop io_loop here instead
-        # self.io_loop.stop()
         # Once-off sensors to query on ?capture_done
         sensors_to_query = []  # TODO: add sensors to query on ?capture_done
         sensors_and_values = self.io_loop.run_sync(
@@ -532,14 +523,14 @@ class BLKATPortalClient(object):
             self.subarray_katportals.pop(product_id)
             logger.info("Deleted KATPortalClient instance for product_id: {}".format(product_id))
 
-    def _capture_stop(self, product_id):
-        """Responds to capture-stop request
+    def build_sub_sensors(self, product_id):
+        """Builds the list of sensors for subscription.
 
         Args:
-            product_id (str): the product id given in the ?configure request
+            product_id (str): the product id given in the ?configure request.
 
         Returns:
-            None
+            sensors_for_update (list): list of full sensor names for subscription.
         """
         # Get cont update sensors
         sensors_for_update = []
@@ -552,10 +543,19 @@ class BLKATPortalClient(object):
         for sensor in self.subarray_sensors:
             sensor = 'subarray_{}_{}'.format(product_id[-1], sensor)
             sensors_for_update.append(sensor)
-        # Unsubscribe from all cont update sensors acquired above.
-        if(len(sensors_for_update) > 0):
-            self.subscription('unsubscribe', product_id, sensors_for_update)
-            
+        return sensors_for_update
+
+    def _capture_stop(self, product_id):
+        """Responds to capture-stop request
+
+        Args:
+            product_id (str): the product id given in the ?configure request
+
+        Returns:
+            None
+        """
+        pass
+ 
     def _other(self, product_id):
         """This is called when an unrecognized request is sent
 
