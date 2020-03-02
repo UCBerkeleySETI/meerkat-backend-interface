@@ -1,13 +1,13 @@
 import setuptools
 
 requires = [
-    'katcp==0.6.2',
-    'katpoint==0.7',
-    'katportalclient==0.2.1',
-    'numpy==1.16.4',
-    'pyyaml==5.1.1',
-    'redis==2.10.6',
-    'tornado==4.5.3',
+    'katcp>=0.7.0',
+    'katpoint>=0.7',
+    'katportalclient>=0.2.1',
+    'numpy>=1.16.4',
+    'pyyaml>=5.1.1',
+    'redis>=2.10.6',
+    'tornado>=4.5.3',
     ]
 
 setuptools.setup(

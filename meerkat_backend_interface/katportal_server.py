@@ -50,7 +50,7 @@ class BLKATPortalClient(object):
 
     def __init__(self, config_file):
         """Our client server to the Katportal"""
-        self.redis_server = redis.StrictRedis()
+        self.redis_server = redis.StrictRedis(decode_responses = True)
         self.p = self.redis_server.pubsub(ignore_subscribe_messages=True)
         self.io_loop = io_loop = tornado.ioloop.IOLoop.current()
         self.subarray_katportals = dict()  # indexed by product IDs
@@ -79,8 +79,9 @@ class BLKATPortalClient(object):
     def start(self):
         self.p.subscribe(REDIS_CHANNELS.alerts)
         self._print_start_image()
-        for message in self.p.listen():
-            msg_parts = message['data'].split(':')
+        for msg in self.p.listen():
+            msg_data = msg['data']
+            msg_parts = msg_data.split(':')
             if len(msg_parts) != 2:
                 logger.info("Not processing this message --> {}".format(message))
                 continue
@@ -317,7 +318,8 @@ class BLKATPortalClient(object):
         if(sub == 'subscribe'):
             result = yield self.subarray_katportals[product_id].subscribe(namespace = product_id) 
             for sensor in sensor_list:
-                result = yield self.subarray_katportals[product_id].set_sampling_strategies(namespace = product_id, sensor, 'event')
+                # Using product_id as namespace (unique to each subarray)
+                result = yield self.subarray_katportals[product_id].set_sampling_strategies(product_id, sensor, 'event')
         elif(sub == 'unsubscribe'):
             result = yield self.subarray_katportals[product_id].unsubscribe(namespace = product_id)
 
