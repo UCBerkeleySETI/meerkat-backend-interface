@@ -326,7 +326,7 @@ def main(port, cfg_file):
         log.info('Configured from {}'.format(cfg_file))
     except:
         log.warning('Configuration not updated; old configuration might be present.')
-    red = redis.StrictRedis(port=port)
+    red = redis.StrictRedis(port=port, decode_responses=True)
     ps = red.pubsub(ignore_subscribe_messages=True)
     ps.subscribe(ALERTS_CHANNEL)
     ps.subscribe(SENSOR_CHANNEL)
@@ -344,7 +344,7 @@ def main(port, cfg_file):
                 log.info('New subarray built: {}'.format(product_id))
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
-                addr_list, port, n_addrs = read_spead_addresses(streams.values()[0], len(hashpipe_instances), streams_per_instance)
+                addr_list, port, n_addrs = read_spead_addresses(list(streams.values())[0], len(hashpipe_instances), streams_per_instance)
                 n_red_chans = len(addr_list)
                 # Number of antennas
                 ant_key = '{}:antennas'.format(product_id)
@@ -412,13 +412,18 @@ def main(port, cfg_file):
                     # Set PKTSTART
                     pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
                     pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log, False)
-                    # Pointing information for the current target
+                    # RA and Dec (string form)
                     target = red.get('{}:target'.format(product_id))
                     target = target.split(',')
-                    ra = target[-2].strip()
-                    dec = target[-1].strip()
-                    pub_gateway_msg(red, global_chan, 'RA_STR', ra, log, False)
-                    pub_gateway_msg(red, global_chan, 'DEC_STR', dec, log, False)
+                    ra_str = target[-2].strip()
+                    dec_str = target[-1].strip()
+                    pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, log, False)
+                    pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, log, False)
+                    # RA and Dec (in degrees)
+                    dec_deg = red.get('{}:pos_request_base_dec'.format(product_id))
+                    ra_deg = red.get('{}:pos_request_base_ra'.format(product_id))
+                    pub_gateway_msg(red, global_chan, 'RA', ra_deg, log, False)
+                    pub_gateway_msg(red, global_chan, 'DEC', dec_deg, log, False)
                 tracking = 1 
             if msg_type == 'not-tracking':
                 if(tracking == 1):

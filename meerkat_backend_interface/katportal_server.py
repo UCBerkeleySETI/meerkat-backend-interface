@@ -119,6 +119,11 @@ class BLKATPortalClient(object):
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
                         '{}:{}:{}'.format('data-suspect', product_id, sensor_value))
+                #RA/Dec
+                elif('pos_request_base_dec' in sensor_name):
+                    self.antenna_consensus(product_id, 'pos_request_base_dec')
+                elif('pos_request_base_ra' in sensor_name):
+                    self.antenna_consensus(product_id, 'pos_request_base_ra')
                 # Target information for publication
                 elif('target' in sensor_name):
                     self.antenna_consensus(product_id, 'target')
@@ -229,8 +234,8 @@ class BLKATPortalClient(object):
             ant_compare = ant_compare + self.redis_server.get('{}:{}_{}'.format(product_id, ant_list[0], sensor_name))*len(ant_list)
             if(ant_status == ant_compare): # all antennas show the same value
                 # Get value from last antenna
-                value = ast.literal_eval(self.redis_server.get('{}:{}_{}'.format(product_id, ant_list[i], sensor_name))) 
-                if(len(value)>0):
+                value = ast.literal_eval(self.redis_server.get('{}:{}_{}'.format(product_id, ant_list[i], sensor_name)))
+                if(value is not None):
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, 
                     '{}:{}:{}'.format(product_id, sensor_name, value))
                     key = '{}:{}'.format(product_id, sensor_name)

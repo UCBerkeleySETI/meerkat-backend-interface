@@ -23,6 +23,8 @@ hashpipe_instances:
 
 sensors_per_antenna:         
 - target
+- pos_request_base_dec
+- pos_request_base_ra
 
 sensors_on_configure:
 - pool_resources
