@@ -421,7 +421,9 @@ def main(port, cfg_file):
                     pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, log, False)
                     # RA and Dec (in degrees)
                     dec_deg = red.get('{}:pos_request_base_dec'.format(product_id))
-                    ra_deg = red.get('{}:pos_request_base_ra'.format(product_id))
+                    # pos_request_base_ra value is given in hrs (single float value)
+                    ra_hrs = red.get('{}:pos_request_base_ra'.format(product_id))
+                    ra_deg = ra_hrs*15.0 # Convert to degrees
                     pub_gateway_msg(red, global_chan, 'RA', ra_deg, log, False)
                     pub_gateway_msg(red, global_chan, 'DEC', dec_deg, log, False)
                 tracking = 1 
