@@ -58,11 +58,13 @@ class BLKATPortalClient(object):
         self.ant_sensors = []  # sensors required from each antenna
         self.stream_sensors = []  # stream sensors (for continuous update)
         self.cbf_conf_sensors = []  # cbf sensors to be queried once-off on configure
+        self.cbf_sensors = [] # cbf sensors (for continuous update)
         self.stream_conf_sensors = [] # stream sensors for acquisition on configure.
         self.conf_sensors = [] # other sensors to be queried once-off on configure
         self.subarray_sensors = [] # subarray-level sensors
         self.cont_update_sensors = [] # will contain all sensors for continuous update
         self.config_file = config_file #check if needed
+        self.cbf_name = 'cbf_1' # Default CBF short name
 
     def MSG_TO_FUNCTION(self, msg_type):
         MSG_TO_FUNCTION_DICT = {
@@ -119,11 +121,12 @@ class BLKATPortalClient(object):
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
                         '{}:{}:{}'.format('data-suspect', product_id, sensor_value))
-                #RA/Dec
-                elif('pos_request_base_dec' in sensor_name):
-                    self.antenna_consensus(product_id, 'pos_request_base_dec')
-                elif('pos_request_base_ra' in sensor_name):
-                    self.antenna_consensus(product_id, 'pos_request_base_ra')
+                #RA/Dec/Az/El
+                elif('pos_request_base' in sensor_name):
+                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts,
+                    '{}:{}:{}'.format(product_id, sensor_name, sensor_value))
+                    # Aternate method:
+                    # self.antenna_consensus(product_id, 'pos_request_base_dec')
                 # Target information for publication
                 elif('target' in sensor_name):
                     self.antenna_consensus(product_id, 'target')
@@ -140,7 +143,6 @@ class BLKATPortalClient(object):
                     # Temporary solution for websocket subscription issue
                     if(sensor_value == 'stop'):
                         sensors_for_update = self.build_sub_sensors(product_id)
-                        logger.info(sensors_for_update)
                         if(len(sensors_for_update) > 0):
                             self.subscription('unsubscribe', product_id, sensors_for_update)
                         self.io_loop.stop()
@@ -268,22 +270,39 @@ class BLKATPortalClient(object):
                 ant_sensor_list.append(ant + '_' + sensor)
         return ant_sensor_list
  
-    def gen_stream_sensor_list(self, product_id, stream_sensors, cbf_name):
+    def gen_stream_sensor_list(self, product_id, stream_sensors, cbf_prefix):
         """Automatically builds a list of stream sensor names.
 
         Args:
             product_id (str): The product id given in the ?configure request.
             stream_sensors (list): The stream sensors to be subscribed to.
-            cbf_name (str): full CBF prefix. 
+            cbf_prefix (str): full CBF prefix. 
 
         Returns:
             stream_sensor_list (list): the full sensor names.
         """
         stream_sensor_list = []
         for sensor in stream_sensors:
-            sensor_name = 'subarray_{}_streams_{}_{}'.format(product_id[-1], cbf_name, sensor)
+            sensor_name = 'subarray_{}_streams_{}_{}'.format(product_id[-1], cbf_prefix, sensor)
             stream_sensor_list.append(sensor_name)
         return stream_sensor_list
+
+    def gen_cbf_sensor_list(self, cbf_sensors, cbf_name):
+        """Builds sensor list for cbf sensor names.
+
+        Args:
+            cbf_sensors (list): The cbf sensors to be subscribed to.
+            cbf_name (str): short CBF name. 
+
+        Returns:
+            cbf_sensor_list (list): the full sensor names.
+        """
+        cbf_sensor_list = []
+        for sensor in cbf_sensors:
+            sensor_name = '{}_{}'.format(cbf_name,  sensor)
+            cbf_sensor_list.append(sensor_name)
+        logger.info("CBF_SENSOR_LIST: {}".format(cbf_sensor_list))
+        return cbf_sensor_list
 
     def configure_katportal(self, cfg_file):
         """Configure the katportal_server from the .yml config file.
@@ -299,7 +318,7 @@ class BLKATPortalClient(object):
                 try:
                     cfg = yaml.safe_load(f)
                     return(cfg['sensors_per_antenna'], cfg['cbf_sensors_on_configure'],           
-                    cfg['stream_sensors'], cfg['sensors_on_configure'],
+                    cfg['stream_sensors'], cfg['cbf_sensors'], cfg['sensors_on_configure'],
                     cfg['array_sensors'], cfg['stream_sensors_on_configure'])
                 except yaml.YAMLError as E:
                     logger.error(E)
@@ -362,7 +381,7 @@ class BLKATPortalClient(object):
         """
         # Update configuration:
         try:
-            ant_sensors, cbf_conf_sensors, stream_sensors, conf_sensors, subarray_sensors, stream_conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
+            ant_sensors, cbf_conf_sensors, stream_sensors, cbf_sensors, conf_sensors, subarray_sensors, stream_conf_sensors = self.configure_katportal(os.path.join(os.getcwd(), self.config_file))
             if(ant_sensors is not None):
                 self.ant_sensors = []
                 self.ant_sensors.extend(ant_sensors)
@@ -381,6 +400,9 @@ class BLKATPortalClient(object):
             if(subarray_sensors is not None):
                 self.subarray_sensors = []
                 self.subarray_sensors.extend(subarray_sensors)
+            if(cbf_sensors is not None):
+                self.cbf_sensors = []
+                self.cbf_sensors.extend(cbf_sensors)
             logger.info('Configuration updated')
         except:
             logger.warning('Configuration not updated; old configuration might be present.')
@@ -402,14 +424,14 @@ class BLKATPortalClient(object):
         # instead of CBF_[product_id])
         key = '{}:subarray_{}_{}'.format(product_id, subarray_nr, 'pool_resources')
         pool_resources = self.redis_server.get(key).split(',')
-        cbf_name = self.component_name('cbf', pool_resources, logger)
+        self.cbf_name = self.component_name('cbf', pool_resources, logger)
         key = '{}:{}'.format(product_id, 'cbf_name')
-        write_pair_redis(self.redis_server, key, cbf_name)
+        write_pair_redis(self.redis_server, key, self.cbf_name)
         # Get CBF sensor values required on configure.
         cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
         if(len(self.cbf_conf_sensors) > 0):
             # Complete the CBF sensor names with the CBF component name.
-            cbf_sensor_prefix = '{}_{}_'.format(cbf_name, cbf_prefix)
+            cbf_sensor_prefix = '{}_{}_'.format(self.cbf_name, cbf_prefix)
             cbf_conf_sensor_names = [cbf_sensor_prefix + sensor for sensor in self.cbf_conf_sensors]
             # Get CBF sensors and write to redis. 
             sensors_and_values = self.io_loop.run_sync(
@@ -545,11 +567,16 @@ class BLKATPortalClient(object):
         sensors_for_update.extend(self.gen_ant_sensor_list(product_id, self.ant_sensors))
         # Stream sensors:
         cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
-        sensors_for_update.extend(self.gen_stream_sensor_list(product_id, self.stream_sensors, cbf_prefix))
+        stream_sensors = self.gen_stream_sensor_list(product_id, self.stream_sensors, cbf_prefix)
+        sensors_for_update.extend(stream_sensors)
         # Subarray sensors:
         for sensor in self.subarray_sensors:
             sensor = 'subarray_{}_{}'.format(product_id[-1], sensor)
             sensors_for_update.append(sensor)
+        # CBF sensors:
+        cbf_sensors = self.gen_cbf_sensor_list(self.cbf_sensors, self.cbf_name)
+        sensors_for_update.extend(cbf_sensors)
+        logger.info("SENSORS_FOR_UPDATE: {}".format(sensors_for_update))
         return sensors_for_update
 
     def _capture_stop(self, product_id):

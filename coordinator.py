@@ -420,12 +420,18 @@ def main(port, cfg_file):
                     pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, log, False)
                     pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, log, False)
                     # RA and Dec (in degrees)
-                    dec_deg = red.get('{}:pos_request_base_dec'.format(product_id))
+                    cbf_name = red.get('{}:cbf_name'.format(product_id))
+                    dec_deg = red.get('{}:{}_pos_request_base_dec'.format(product_id, cbf_name))
                     # pos_request_base_ra value is given in hrs (single float value)
-                    ra_hrs = red.get('{}:pos_request_base_ra'.format(product_id))
-                    ra_deg = ra_hrs*15.0 # Convert to degrees
+                    ra_hrs = red.get('{}:{}_pos_request_base_ra'.format(product_id, cbf_name))
+                    ra_deg = float(ra_hrs)*15.0 # Convert to degrees
                     pub_gateway_msg(red, global_chan, 'RA', ra_deg, log, False)
                     pub_gateway_msg(red, global_chan, 'DEC', dec_deg, log, False)
+                    # Azimuth and elevation (in degrees):
+                    az = red.get('{}:{}_pos_request_base_azim'.format(product_id, cbf_name))
+                    el = red.get('{}:{}_pos_request_base_elev'.format(product_id, cbf_name))
+                    pub_gateway_msg(red, global_chan, 'AZ', az, log, False)
+                    pub_gateway_msg(red, global_chan, 'EL', el, log, False)
                 tracking = 1 
             if msg_type == 'not-tracking':
                 if(tracking == 1):
