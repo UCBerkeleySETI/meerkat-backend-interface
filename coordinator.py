@@ -146,34 +146,38 @@ def json_str_formatter(str_dict):
     str_dict = str_dict.replace('u', '')  # Remove unicode 'u'
     return str_dict
 
-def create_addr_list_filled(addr0, n_groups, n_addrs, streams_per_instance):
+def create_addr_list_filled(addr0, n_groups, n_addrs, streams_per_instance, offset):
     """Creates list of IP multicast subscription address groups.
     Fills the list for each available processing instance 
     sequentially untill all streams have been assigned.
 
     Args:
         addr0 (str): IP address of the first stream.
-        n_groups (int): Number of available processing instances.
-        n_addrs (int): Total number of streams to process.
-        streams_per_instance (int): Number of streams to be processed 
+        n_groups (int): number of available processing instances.
+        n_addrs (int): total number of streams to process.
+        streams_per_instance (int): number of streams to be processed 
         by each instance.
+        offset (int): number of streams to skip before apportioning
+        IPs.
 
     Returns:
         addr_list (list): list of IP address groups for subscription.
     """
     prefix, suffix0 = addr0.rsplit('.', 1)
+    suffix0 = int(suffix0) + offset
+    n_addrs = n_addrs - offset
     addr_list = []
     if(n_addrs > streams_per_instance*n_groups):
         log.warning('Too many streams: {} will not be processed.'.format(n_addrs - streams_per_instance*n_groups))
         for i in range(0, n_groups):
-            addr_list.append(prefix + '.{}+{}'.format(int(suffix0), streams_per_instance - 1))
-            suffix0 = int(suffix0) + streams_per_instance
+            addr_list.append(prefix + '.{}+{}'.format(suffix0, streams_per_instance - 1))
+            suffix0 = suffix0 + streams_per_instance
     else:
         n_instances_req = int(np.ceil(n_addrs/float(streams_per_instance)))
         for i in range(1, n_instances_req):
-            addr_list.append(prefix + '.{}+{}'.format(int(suffix0), streams_per_instance - 1))
-            suffix0 = int(suffix0) + streams_per_instance
-        addr_list.append(prefix + '.{}+{}'.format(int(suffix0), n_addrs - 1 - i*streams_per_instance))
+            addr_list.append(prefix + '.{}+{}'.format(suffix0, streams_per_instance - 1))
+            suffix0 = suffix0 + streams_per_instance
+        addr_list.append(prefix + '.{}+{}'.format(suffix0, n_addrs - 1 - i*streams_per_instance))
     return addr_list
 
 def create_addr_list_distributed(addr0, n_groups, n_addrs):
@@ -199,14 +203,14 @@ def create_addr_list_distributed(addr0, n_groups, n_addrs):
         suffix0 = int(suffix0) + n_per_group[i]
     return addr_list
 
-def read_spead_addresses(spead_addrs, n_groups, streams_per_instance):
+def read_spead_addresses(spead_addrs, n_groups, streams_per_instance, offset):
     """Parses spead addresses given in the format: spead://<ip>+<count>:<port>
     Assumes this format.
 
     Args:
         spead_addrs (str): string containing spead IP addresses in the format above.
         n_groups (int): number of stream addresses to be sent to each processing instance.
-
+        offset (int): number of streams to skip before apportioning IPs.
     Returns:
         addr_list (list): list of spead stream IP address groups.
         port (int): port number.
@@ -216,7 +220,7 @@ def read_spead_addresses(spead_addrs, n_groups, streams_per_instance):
     try:
         addr0, n_addrs = addrs.split('+')
         n_addrs = int(n_addrs) + 1
-        addr_list = create_addr_list_filled(addr0, n_groups, n_addrs, streams_per_instance)
+        addr_list = create_addr_list_filled(addr0, n_groups, n_addrs, streams_per_instance, offset)
     except ValueError:
         addr_list = [addrs + '+0']
         n_addrs = 1
@@ -342,10 +346,16 @@ def main(port, cfg_file):
             global_chan = HPGDOMAIN + ':///set'
             if msg_type == 'conf_complete':
                 log.info('New subarray built: {}'.format(product_id))
+                # Get IP offset (for ingesting fractions of the band)
+                offset = int(red.get('{}:ip_offset'.format(product_id)))
+                if(offset > 0):
+                    log.info('Stream IP offset applied: {}'.format(offset))
+                # Generate list of stream IP addresses
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
-                addr_list, port, n_addrs = read_spead_addresses(list(streams.values())[0], len(hashpipe_instances), streams_per_instance)
+                addr_list, port, n_addrs = read_spead_addresses(list(streams.values())[0], len(hashpipe_instances), streams_per_instance, offset)
                 n_red_chans = len(addr_list)
+                log.info(addr_list)
                 # Number of antennas
                 ant_key = '{}:antennas'.format(product_id)
                 n_ants = len(red.lrange(ant_key, 0, red.llen(ant_key)))
@@ -384,19 +394,19 @@ def main(port, cfg_file):
                 # Note: no sign information!  
                 sensor_key = cbf_sensor_name(product_id, red, 'adc_sample_rate')
                 adc_sample_rate = red.get(sensor_key)
-                # Default to negative for now.
-                coarse_chan_bw = -1*float(adc_sample_rate)/2.0/int(n_freq_chans)/1e6
+                coarse_chan_bw = float(adc_sample_rate)/2.0/int(n_freq_chans)/1e6
                 coarse_chan_bw = '{0:.17g}'.format(coarse_chan_bw)
                 pub_gateway_msg(red, global_chan, 'CHAN_BW', coarse_chan_bw, log, True) 
                 # Set PKTSTART to 0 on configure
                 pub_gateway_msg(red, global_chan, 'PKTSTART', 0, log, True) 
+                # Subscription IPs for processing nodes
                 for i in range(n_red_chans):
                     local_chan = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
                     # Number of streams for instance i
                     n_streams_per_instance = int(addr_list[i][-1])+1
                     pub_gateway_msg(red, local_chan, 'NSTRM', n_streams_per_instance, log, True)
                     # Absolute starting channel for instance i
-                    s_chan = i*n_streams_per_instance*int(n_chans_per_substream)
+                    s_chan = offset*int(n_chans_per_substream) + i*n_streams_per_instance*int(n_chans_per_substream)
                     pub_gateway_msg(red, local_chan, 'SCHAN', s_chan, log, True)
                     # Destination IP addresses for instance i
                     pub_gateway_msg(red, local_chan, 'DESTIP', addr_list[i], log, True)
