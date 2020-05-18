@@ -347,9 +347,13 @@ def main(port, cfg_file):
             if msg_type == 'conf_complete':
                 log.info('New subarray built: {}'.format(product_id))
                 # Get IP offset (for ingesting fractions of the band)
-                offset = int(red.get('{}:ip_offset'.format(product_id)))
-                if(offset > 0):
-                    log.info('Stream IP offset applied: {}'.format(offset))
+                try:
+                    offset = int(red.get('{}:ip_offset'.format(product_id)))
+                    if(offset > 0):
+                        log.info('Stream IP offset applied: {}'.format(offset))
+                except:
+                    log.info("No stream IP offset; defaulting to 0")
+                    offset = 0
                 # Generate list of stream IP addresses
                 all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
