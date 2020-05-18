@@ -127,6 +127,10 @@ class BLKATPortalClient(object):
                     '{}:{}:{}'.format(product_id, sensor_name, sensor_value))
                     # Aternate method:
                     # self.antenna_consensus(product_id, 'pos_request_base_dec')
+                # Check for noise diode operation:
+                elif('diode' in sensor_name):
+                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts,
+                    '{}:{}:{}'.format(product_id, sensor_name, sensor_value))
                 # Target information for publication
                 elif('target' in sensor_name):
                     self.antenna_consensus(product_id, 'target')
@@ -146,7 +150,7 @@ class BLKATPortalClient(object):
                         if(len(sensors_for_update) > 0):
                             self.subscription('unsubscribe', product_id, sensors_for_update)
                         self.io_loop.stop()
-                        
+                                         
     def subarray_data_suspect(self, product_id):
         """Publish a global subarray data-suspect value by checking each
         individual antenna. If any antennas are marked faulty by an operator, 
