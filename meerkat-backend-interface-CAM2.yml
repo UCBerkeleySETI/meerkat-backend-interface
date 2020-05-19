@@ -35,6 +35,7 @@ cbf_sensors:
 - pos_request_base_ra
 - pos_request_base_dec
 - pos_request_base_elev
+- target
 
 cbf_sensors_on_configure:
 - antenna_channelised_voltage_n_chans_per_substream

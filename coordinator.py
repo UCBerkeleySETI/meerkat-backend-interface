@@ -433,20 +433,25 @@ def main(port, cfg_file):
                     dec_str = target[-1].strip()
                     pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, log, False)
                     pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, log, False)
-                    # RA and Dec (in degrees)
-                    cbf_name = red.get('{}:cbf_name'.format(product_id))
-                    dec_deg = red.get('{}:{}_pos_request_base_dec'.format(product_id, cbf_name))
-                    # pos_request_base_ra value is given in hrs (single float value)
-                    ra_hrs = red.get('{}:{}_pos_request_base_ra'.format(product_id, cbf_name))
-                    ra_deg = float(ra_hrs)*15.0 # Convert to degrees
-                    pub_gateway_msg(red, global_chan, 'RA', ra_deg, log, False)
-                    pub_gateway_msg(red, global_chan, 'DEC', dec_deg, log, False)
-                    # Azimuth and elevation (in degrees):
-                    az = red.get('{}:{}_pos_request_base_azim'.format(product_id, cbf_name))
-                    el = red.get('{}:{}_pos_request_base_elev'.format(product_id, cbf_name))
-                    pub_gateway_msg(red, global_chan, 'AZ', az, log, False)
-                    pub_gateway_msg(red, global_chan, 'EL', el, log, False)
                 tracking = 1 
+            log.info(msg_parts)
+            if('pos_request_base' in msg_parts[1]):
+                    # RA and Dec (in degrees)
+                    if('dec' in msg_parts[1]):
+                        dec_deg = msg_parts[2]
+                        pub_gateway_msg(red, global_chan, 'DEC', dec_deg, log, False)
+                    elif('ra' in msg_parts[1]):    
+                        # pos_request_base_ra value is given in hrs (single float value)
+                        ra_hrs = msg_parts[2]
+                        ra_deg = float(ra_hrs)*15.0 # Convert to degrees
+                        pub_gateway_msg(red, global_chan, 'RA', ra_deg, log, False)
+                    # Azimuth and elevation (in degrees):
+                    elif('azim' in msg_parts[1]):
+                        az = msg_parts[2]
+                        pub_gateway_msg(red, global_chan, 'AZ', az, log, False)
+                    elif('elev' in msg_parts[1]):
+                        el = msg_parts[2]
+                        pub_gateway_msg(red, global_chan, 'EL', el, log, False)
             if msg_type == 'not-tracking':
                 if(tracking == 1):
                     # For the moment during testing, get dwell time from one of the hosts.
