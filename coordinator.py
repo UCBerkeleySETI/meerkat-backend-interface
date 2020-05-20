@@ -8,6 +8,7 @@ import logging
 import sys
 import redis
 import numpy as np
+import string
 from meerkat_backend_interface import redis_tools
 from meerkat_backend_interface.logger import log, set_logger
 
@@ -318,6 +319,22 @@ def stream_sensor_name(product_id, redis_server, sensor):
     stream_sensor = '{}:subarray_{}_streams_{}_{}'.format(product_id, s_num, cbf_prefix, sensor)
     return stream_sensor
 
+def format_des(target_des, length):
+    """Limit target description length and replace punctuation with dashes for compatibility
+    with filterbank/raw file header requirements.
+
+    Args:
+        target_des (str): Target description.
+        length (int): Maximum length for target description.
+
+    Returns:
+        target: Formatted target description suitable for filterbank/raw headers.
+    """ 
+    table = str.maketrans(string.punctuation, '-'*32)
+    target = target_des.translate(table)
+    target = target[0:length]
+    return(target)
+
 def main(port, cfg_file):
     # Refactor this in future.
     # For further information on the Hashpipe-Redis gateway messages, please see
@@ -434,24 +451,26 @@ def main(port, cfg_file):
                     pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, log, False)
                     pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, log, False)
                 tracking = 1 
-            log.info(msg_parts)
             if('pos_request_base' in msg_parts[1]):
-                    # RA and Dec (in degrees)
-                    if('dec' in msg_parts[1]):
-                        dec_deg = msg_parts[2]
-                        pub_gateway_msg(red, global_chan, 'DEC', dec_deg, log, False)
-                    elif('ra' in msg_parts[1]):    
-                        # pos_request_base_ra value is given in hrs (single float value)
-                        ra_hrs = msg_parts[2]
-                        ra_deg = float(ra_hrs)*15.0 # Convert to degrees
-                        pub_gateway_msg(red, global_chan, 'RA', ra_deg, log, False)
-                    # Azimuth and elevation (in degrees):
-                    elif('azim' in msg_parts[1]):
-                        az = msg_parts[2]
-                        pub_gateway_msg(red, global_chan, 'AZ', az, log, False)
-                    elif('elev' in msg_parts[1]):
-                        el = msg_parts[2]
-                        pub_gateway_msg(red, global_chan, 'EL', el, log, False)
+                # RA and Dec (in degrees)
+                if('dec' in msg_parts[1]):
+                    dec_deg = msg_parts[2]
+                    pub_gateway_msg(red, global_chan, 'DEC', dec_deg, log, False)
+                elif('ra' in msg_parts[1]):    
+                    # pos_request_base_ra value is given in hrs (single float value)
+                    ra_hrs = msg_parts[2]
+                    ra_deg = float(ra_hrs)*15.0 # Convert to degrees
+                    pub_gateway_msg(red, global_chan, 'RA', ra_deg, log, False)
+                # Azimuth and elevation (in degrees):
+                elif('azim' in msg_parts[1]):
+                    az = msg_parts[2]
+                    pub_gateway_msg(red, global_chan, 'AZ', az, log, False)
+                elif('elev' in msg_parts[1]):
+                    el = msg_parts[2]
+                    pub_gateway_msg(red, global_chan, 'EL', el, log, False)
+            if('target' in msg_parts[1]):
+                target = format_des("".join(msg_parts[2:]), 68)
+                pub_gateway_msg(red, global_chan, 'TARGET', target, log, False)    
             if msg_type == 'not-tracking':
                 if(tracking == 1):
                     # For the moment during testing, get dwell time from one of the hosts.
