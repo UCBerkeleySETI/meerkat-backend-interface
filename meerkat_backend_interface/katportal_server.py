@@ -12,6 +12,7 @@ import os
 import ast
 import json
 import numpy as np
+from datetime import datetime
 
 from .redis_tools import (
     REDIS_CHANNELS,
@@ -133,7 +134,10 @@ class BLKATPortalClient(object):
                     '{}:{}:{}'.format(product_id, sensor_name, sensor_value))
                 # Target information for publication
                 elif('target' in sensor_name):
-                    self.antenna_consensus(product_id, 'target')
+                    #self.antenna_consensus(product_id, 'target')
+                    publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts,
+                    '{}:{}:{}'.format(product_id, sensor_name, sensor_value))
+                    self.save_history(self.redis_server, product_id, 'target', sensor_value)
                 # Observation state for publication
                 elif('activity' in sensor_name):
                     if(sensor_value == 'track'):
@@ -374,6 +378,22 @@ class BLKATPortalClient(object):
             log.warning('Could not find component: {}'.format(short_name))
         return full_name 
 
+    def save_history(self, redis_server, product_id, key, value):
+        """Save a particular key-value pair to a redis sensor history hash.
+        
+        Args:
+            redis_server: current Redis server.
+            product_id (str): the product ID given in the ?configure request.
+            key (str): the name of the history item.
+            value (str): the contents of the history item.
+
+        Returns:
+            None
+        """
+        hash_name = 'history:{}:{}'.format(product_id, key)
+        time = datetime.now().strftime("%Y%m%dT%H%M%S.%3NZ")
+        redis_server.hset(hash_name, time, value)
+
     def _configure(self, product_id):
         """Executes when configure request is processed
 
@@ -416,6 +436,10 @@ class BLKATPortalClient(object):
         self.subarray_katportals[product_id] = client
         logger.info("Created katportalclient object for : {}".format(product_id))
         subarray_nr = product_id[-1]
+        # Enter antenna list into the history hash
+        ant_key = '{}:antennas'.format(product_id) 
+        ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))
+        self.save_history(self.redis_server, product_id, 'antennas', str(ant_list))
         # Get sensors on configure
         if(len(self.conf_sensors) > 0):
             conf_sensor_names = ['subarray_{}_'.format(subarray_nr) + sensor for sensor in self.conf_sensors]
@@ -476,8 +500,8 @@ class BLKATPortalClient(object):
         labelling_sensor = '{}:{}input_labelling'.format(product_id, cbf_sensor_prefix)
         labelling = self.redis_server.get(labelling_sensor)
         labelling = ast.literal_eval(labelling)
-        antennas = [item[0] for item in labelling]
-        feng_ids = [int(np.floor(int(item[1])/2.0)) for item in labelling]
+        antennas = str([item[0] for item in labelling])
+        feng_ids = str([int(np.floor(int(item[1])/2.0)) for item in labelling])
         return antennas, feng_ids
 
     def _capture_init(self, product_id):

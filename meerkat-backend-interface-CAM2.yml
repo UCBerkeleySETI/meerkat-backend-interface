@@ -2,7 +2,7 @@
 
 # Temporary; to be calculated by a function in future.
 streams_per_instance: 
-- 3
+- 4
 
 hashpipe_instances:
 - blpn48/0
@@ -22,7 +22,6 @@ hashpipe_instances:
 - blpn63/0
 
 sensors_per_antenna:         
-- target
 - dig_l_band_noise_diode
 - dig_s_band_noise_diode
 - dig_u_band_noise_diode
