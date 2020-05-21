@@ -105,7 +105,6 @@ SPEAD stream addresses are published along with other information to individual 
 | `SCHAN=[first starting channel]`  | Absolute starting channel number for a particular instance.                                      | `[HPGDOMAIN]://[hashpipe_instance]/set` |
 | `DESTIP=[port]`                   | Port number for SPEAD streams.                                                                   | `[HPGDOMAIN]:///set`                    |
 | `DESTIP=0.0.0.0`                  | Message to unsubscribe to streams (sent on deconfigure).                                         | `[HPGDOMAIN]:///set`                    |  
-| `NETSTAT=LISTEN`                  | Message to stop recording data, sent when `capture-stop` is published to the `alerts` channel.   | `[HPGDOMAIN]:///set`                    |
 | `FENCHAN=[num channels]`          | Total number of channels received on configure.                                                  | `[HPGDOMAIN]:///set`                    |
 | `FENSTRM=[num streams]`           | Total number of streams received on configure.                                                   | `[HPGDOMAIN]:///set`                    |
 | `HNCHAN=[channels per substream]` | Number of channels per substream.                                                                | `[HPGDOMAIN]:///set`                    |
@@ -118,4 +117,10 @@ SPEAD stream addresses are published along with other information to individual 
 | `FESTATUS=[data-suspect bitmask]` | Hex mask indicating data suspect for each polarisation from each F-eng. 1 = data is suspect.  | `[HPGDOMAIN]:///set`                    |
 | `FECENTER=[centre frequency]`     | On-sky observation centre frequency.                                                             | `[HPGDOMAIN]:///set`                    |
 | `DWELL=[dwell time]`              | Duration of recording. Can also be used to halt a recording.                                     | `[HPGDOMAIN]:///set`                    |
-
+| `SRC_NAME=[source name]`          | Source name (description retrieved from CAM).                                                    | `[HPGDOMAIN]:///set`                    |
+| `AZ=[azimuth]`                    | Azimuth (in degrees).                                                                            | `[HPGDOMAIN]:///set`                    |
+| `EL=[elevation]`                  | Elevation (in degrees).                                                                          | `[HPGDOMAIN]:///set`                    |
+| `RA_STR=[RA]`                     | RA (string form).                                                                                | `[HPGDOMAIN]:///set`                    |
+| `DEC_STR=[Dec]`                   | Declination (string form).                                                                       | `[HPGDOMAIN]:///set`                    |
+| `RA=[RA]`                         | RA (degrees).                                                                                    | `[HPGDOMAIN]:///set`                    |
+| `DEC=[Dec]`                       | Declination (degrees).                                                                           | `[HPGDOMAIN]:///set`                    |
