@@ -319,19 +319,23 @@ def stream_sensor_name(product_id, redis_server, sensor):
     stream_sensor = '{}:subarray_{}_streams_{}_{}'.format(product_id, s_num, cbf_prefix, sensor)
     return stream_sensor
 
-def format_des(target_des, length):
+def format_des(target_des, length, stop):
     """Limit target description length and replace punctuation with dashes for compatibility
-    with filterbank/raw file header requirements.
+    with filterbank/raw file header requirements. All contents up to the stop character
+    are kept.
 
     Args:
         target_des (str): Target description.
         length (int): Maximum length for target description.
+        stop (str): Character at which to stop. 
 
     Returns:
         target: Formatted target description suitable for filterbank/raw headers.
     """ 
-    table = str.maketrans(string.punctuation, '-'*32)
-    target = target_des.translate(table)
+    punctuation = "!\"#$%&\'()*,./:;<=>?@[\\]^_`{|}~" # note + and - removed
+    table = str.maketrans(punctuation, '-'*30)
+    target = target_des.split(stop)[0]
+    target = target.translate(table)
     target = target[0:length]
     return(target)
 
@@ -469,8 +473,8 @@ def main(port, cfg_file):
                     el = msg_parts[2]
                     pub_gateway_msg(red, global_chan, 'EL', el, log, False)
             if('target' in msg_parts[1]):
-                target = format_des("".join(msg_parts[2:]), 68)
-                pub_gateway_msg(red, global_chan, 'TARGET', target, log, False)    
+                target = format_des("".join(msg_parts[2:]), 68, " ")
+                pub_gateway_msg(red, global_chan, 'SRC_NAME', target, log, False)    
             if msg_type == 'not-tracking':
                 if(tracking == 1):
                     # For the moment during testing, get dwell time from one of the hosts.
