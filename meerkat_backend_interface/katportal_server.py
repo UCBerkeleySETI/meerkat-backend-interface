@@ -391,7 +391,12 @@ class BLKATPortalClient(object):
             None
         """
         hash_name = 'history:{}:{}'.format(product_id, key)
-        time = datetime.now().strftime("%Y%m%dT%H%M%S.%3NZ")
+        # Avoid isoformat from datetime as behaviour not consisent
+        # Avoid specifying strftime decimal places due to inconsistent behaviour
+        # Recommmendation seems to be to simply truncate microseconds
+        # if need be.
+        time = datetime.utcnow()
+        time = time.strftime("%Y%m%dT%H%M%S.%fZ")
         redis_server.hset(hash_name, time, value)
 
     def _configure(self, product_id):
