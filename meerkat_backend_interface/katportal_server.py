@@ -309,7 +309,6 @@ class BLKATPortalClient(object):
         for sensor in cbf_sensors:
             sensor_name = '{}_{}'.format(cbf_name,  sensor)
             cbf_sensor_list.append(sensor_name)
-        logger.info("CBF_SENSOR_LIST: {}".format(cbf_sensor_list))
         return cbf_sensor_list
 
     def configure_katportal(self, cfg_file):
@@ -396,7 +395,8 @@ class BLKATPortalClient(object):
         # Recommmendation seems to be to simply truncate microseconds
         # if need be.
         time = datetime.utcnow()
-        time = time.strftime("%Y%m%dT%H%M%S.%fZ")
+        # Set ms field to 000 as specified
+        time = time.strftime("%Y%m%dT%H%M%S.000Z")
         redis_server.hset(hash_name, time, value)
 
     def _configure(self, product_id):
@@ -518,17 +518,14 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        schedule_blocks = self.io_loop.run_sync(lambda: self._get_future_targets(product_id))
-        key = "{}:schedule_blocks".format(product_id)
-        write_pair_redis(self.redis_server, key, json.dumps(schedule_blocks))
-        publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, key)
-        # Once off sensor values on capture-init
-        sensors_to_query = []  # TODO: add sensors to query on ?capture_init
-        sensors_and_values = self.io_loop.run_sync(
-            lambda: self._get_sensor_values(product_id, sensors_to_query))
-        for sensor_name, value in sensors_and_values.items():
-            key = "{}:{}".format(product_id, sensor_name)
-            write_pair_redis(self.redis_server, key, repr(value))
+        try:
+            schedule_blocks = self.io_loop.run_sync(lambda: self._get_future_targets(product_id), timeout = 5)
+            key = "{}:schedule_blocks".format(product_id)
+            write_pair_redis(self.redis_server, key, json.dumps(schedule_blocks))
+            publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, key)
+        except:
+            logger.error("Could not retrieve schedule blocks")
+  
 
     def _capture_start(self, product_id):
         """Responds to capture-start request
@@ -609,7 +606,6 @@ class BLKATPortalClient(object):
         # CBF sensors:
         cbf_sensors = self.gen_cbf_sensor_list(self.cbf_sensors, self.cbf_name)
         sensors_for_update.extend(cbf_sensors)
-        logger.info("SENSORS_FOR_UPDATE: {}".format(sensors_for_update))
         return sensors_for_update
 
     def _capture_stop(self, product_id):
