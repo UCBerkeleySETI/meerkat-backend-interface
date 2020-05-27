@@ -93,7 +93,8 @@ class BLBackendInterface(AsyncDeviceServer):
         set up.
         """
         super(BLBackendInterface, self).start()
-        print(R"""
+        if(sys.stdout.isatty()):
+            print(R"""
                       ,'''''-._
                      ;  ,.  <> `-._
                      ;  \'   _,--'"

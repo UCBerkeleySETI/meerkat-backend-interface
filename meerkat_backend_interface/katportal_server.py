@@ -9,6 +9,7 @@ from functools import partial
 import json
 import yaml
 import os
+import sys
 import ast
 import json
 import numpy as np
@@ -81,7 +82,8 @@ class BLKATPortalClient(object):
     
     def start(self):
         self.p.subscribe(REDIS_CHANNELS.alerts)
-        self._print_start_image()
+        if(sys.stdout.isatty()):
+            self._print_start_image()
         for msg in self.p.listen():
             msg_data = msg['data']
             msg_parts = msg_data.split(':')
