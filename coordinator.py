@@ -390,7 +390,6 @@ def main(port, cfg_file):
                 streams = all_streams[STREAM_TYPE]
                 addr_list, port, n_addrs = read_spead_addresses(list(streams.values())[0], len(hashpipe_instances), streams_per_instance, offset)
                 n_red_chans = len(addr_list)
-                log.info(addr_list)
                 # Number of antennas
                 ant_key = '{}:antennas'.format(product_id)
                 n_ants = len(red.lrange(ant_key, 0, red.llen(ant_key)))

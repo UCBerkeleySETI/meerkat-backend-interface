@@ -137,8 +137,6 @@ class BLKATPortalClient(object):
                 # Target information for publication
                 elif('target' in sensor_name):
                     #self.antenna_consensus(product_id, 'target')
-                    logger.info(sensor_name)
-                    logger.info(sensor_value)
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts,
                     '{}:{}:{}'.format(product_id, sensor_name, sensor_value))
                     self.save_history(self.redis_server, product_id, 'target', sensor_value)
@@ -445,10 +443,11 @@ class BLKATPortalClient(object):
         self.subarray_katportals[product_id] = client
         logger.info("Created katportalclient object for : {}".format(product_id))
         subarray_nr = product_id[-1]
-        # Enter antenna list into the history hash
         ant_key = '{}:antennas'.format(product_id) 
         ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))
-        self.save_history(self.redis_server, product_id, 'antennas', str(ant_list))
+        # Enter antenna list into the history hash
+        ant_history = json.dumps(ant_list)
+        self.save_history(self.redis_server, product_id, 'antennas', ant_history)
         # Get sensors on configure
         if(len(self.conf_sensors) > 0):
             conf_sensor_names = ['subarray_{}_'.format(subarray_nr) + sensor for sensor in self.conf_sensors]
