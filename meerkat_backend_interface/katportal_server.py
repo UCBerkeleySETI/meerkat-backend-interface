@@ -137,6 +137,8 @@ class BLKATPortalClient(object):
                 # Target information for publication
                 elif('target' in sensor_name):
                     #self.antenna_consensus(product_id, 'target')
+                    logger.info(sensor_name)
+                    logger.info(sensor_value)
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts,
                     '{}:{}:{}'.format(product_id, sensor_name, sensor_value))
                     self.save_history(self.redis_server, product_id, 'target', sensor_value)

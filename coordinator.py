@@ -319,23 +319,31 @@ def stream_sensor_name(product_id, redis_server, sensor):
     stream_sensor = '{}:subarray_{}_streams_{}_{}'.format(product_id, s_num, cbf_prefix, sensor)
     return stream_sensor
 
-def format_des(target_des, length, stop):
+def target_name(target_string, length, delimiter = "|"):
     """Limit target description length and replace punctuation with dashes for compatibility
     with filterbank/raw file header requirements. All contents up to the stop character
     are kept.
 
     Args:
-        target_des (str): Target description.
+        target_string (str): Target description string from CBF. A typical example:
+        "J0918-1205 | Hyd A | Hydra A | 3C 218 | PKS 0915-11, radec, 9:18:05.28, -12:05:48.9"
         length (int): Maximum length for target description.
-        stop (str): Character at which to stop. 
+        delimiter (str): Character at which to split the target string. 
 
     Returns:
         target: Formatted target description suitable for filterbank/raw headers.
     """ 
-    punctuation = "!\"#$%&\'()*,./:;<=>?@[\\]^_`{|}~" # note + and - removed
-    table = str.maketrans(punctuation, '-'*30)
-    target = target_des.split(stop)[0]
+    # Assuming target name or description will always come first
+    target = target_string.split(',')[0] # Split at first comma
+    target = target.split(delimiter)[0] # Split at specified delimiter
+    target = target.strip() # Remove leading and trailing whitespace
+    # Punctuation below taken from string.punctuation()
+    # Note that + and - have been removed (relevant to coordinate names)
+    punctuation = "!\"#$%&\'()*,./:;<=>?@[\\]^_`{|}~" 
+    # Replace all punctuation with underscores
+    table = str.maketrans(punctuation, '_'*30)
     target = target.translate(table)
+    # Limit target string to max allowable in headers (68 chars)
     target = target[0:length]
     return(target)
 
@@ -357,7 +365,9 @@ def main(port, cfg_file):
     ps.subscribe(SENSOR_CHANNEL)
     try:
         for message in ps.listen():
-            msg_parts = message['data'].split(':')
+            # Split message only twice - the format is as follows:
+            # description_1:description_2:value
+            msg_parts = message['data'].split(':', 2)
             if len(msg_parts) < 2:
                 log.info("Not processing this message --> {}".format(message))
                 continue
@@ -473,7 +483,7 @@ def main(port, cfg_file):
                     el = msg_parts[2]
                     pub_gateway_msg(red, global_chan, 'EL', el, log, False)
             if('target' in msg_parts[1]):
-                target = format_des("".join(msg_parts[2:]), 68, " ")
+                target = target_name(msg_parts[2], 68, "|")
                 pub_gateway_msg(red, global_chan, 'SRC_NAME', target, log, False)    
             if msg_type == 'not-tracking':
                 if(tracking == 1):
