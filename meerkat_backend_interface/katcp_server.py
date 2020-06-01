@@ -210,7 +210,8 @@ ___,-| |----''    / |         `._`-.          `----
         # Extracting CBF prefix from configure message as recommended by CAM
         try:
             stream_type = 'cbf.antenna_channelised_voltage'
-            cbf_prefix = json_dict[stream_type].keys()[0].split('.')[0]
+            cbf_prefix = next(iter(json_dict[stream_type])).split('.')[0]
+            log.info('CBF prefix extracted: {}'.format(cbf_prefix))            
         except Exception as e:
             cbf_prefix = 'wide'
             log.error('Could not extract CBF prefix; defaulting to \'wide\'')
