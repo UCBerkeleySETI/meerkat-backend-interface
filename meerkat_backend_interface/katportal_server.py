@@ -453,7 +453,7 @@ class BLKATPortalClient(object):
         # Get sensors on configure
         if(len(self.conf_sensors) > 0):
             conf_sensor_names = ['subarray_{}_'.format(subarray_nr) + sensor for sensor in self.conf_sensors]
-            sensors_and_values = self.io_loop.uun_sync(
+            sensors_and_values = self.io_loop.run_sync(
                 lambda: self._get_sensor_values(product_id, conf_sensor_names))
             for sensor_name, details in sensors_and_values.items():
                 key = "{}:{}".format(product_id, sensor_name)
@@ -565,15 +565,17 @@ class BLKATPortalClient(object):
             None, but does many things!
         """
         # Once-off sensors to query on ?capture_done
-        sensors_to_query = []  # TODO: add sensors to query on ?capture_done
-        try:
-            sensors_and_values = self.io_loop.run_sync(
-                lambda: self._get_sensor_values(product_id, sensors_to_query))
-            for sensor_name, value in sensors_and_values.items():
-                key = "{}:{}".format(product_id, sensor_name)
-                write_pair_redis(self.redis_server, key, repr(value))
-        except:
-            logger.error("Could not retrieve once-off sensors: capture-done")
+        # Uncomment below to add sensors for query.
+        # sensors_to_query = [] 
+        #try:
+        #    sensors_and_values = self.io_loop.run_sync(
+        #        lambda: self._get_sensor_values(product_id, sensors_to_query))
+        #    for sensor_name, value in sensors_and_values.items():
+        #        key = "{}:{}".format(product_id, sensor_name)
+        #        write_pair_redis(self.redis_server, key, repr(value))
+        #except:
+        #    logger.error("Could not retrieve once-off sensors: capture-done")
+        pass 
 
     def _deconfigure(self, product_id):
         """Responds to deconfigure request
@@ -584,15 +586,17 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        sensors_to_query = []  # TODO: add sensors to query on ?deconfigure
-        try:
-            sensors_and_values = self.io_loop.run_sync(
-                lambda: self._get_sensor_values(product_id, sensors_to_query))
-            for sensor_name, value in sensors_and_values.items():
-                key = "{}:{}".format(product_id, sensor_name)
-                write_pair_redis(self.redis_server, key, repr(value))
-        except:   
-            logger.error("Could not retrieve once-off sensors: capture-done")
+        # Once-off sensors to query on ?deconfigure
+        # Uncomment this block to add sensors for query
+        #sensors_to_query = []  
+        #try:
+        #    sensors_and_values = self.io_loop.run_sync(
+        #        lambda: self._get_sensor_values(product_id, sensors_to_query))
+        #    for sensor_name, value in sensors_and_values.items():
+        #        key = "{}:{}".format(product_id, sensor_name)
+        #        write_pair_redis(self.redis_server, key, repr(value))
+        #except:   
+        #    logger.error("Could not retrieve once-off sensors: deconfigure")
         if product_id not in self.subarray_katportals:
             logger.warning("Failed to deconfigure a non-existent product_id: {}".format(product_id))
         else:
@@ -634,6 +638,17 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
+        # Once-off sensors to query on ?capture-stop
+        # Uncomment this block to add sensors for query
+        #sensors_to_query = []  
+        #try:
+        #    sensors_and_values = self.io_loop.run_sync(
+        #        lambda: self._get_sensor_values(product_id, sensors_to_query))
+        #    for sensor_name, value in sensors_and_values.items():
+        #        key = "{}:{}".format(product_id, sensor_name)
+        #        write_pair_redis(self.redis_server, key, repr(value))
+        #except:   
+        #    logger.error("Could not retrieve once-off sensors: capture-stop")
         pass
  
     def _other(self, product_id):
