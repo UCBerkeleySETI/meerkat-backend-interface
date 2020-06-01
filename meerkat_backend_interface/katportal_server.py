@@ -105,6 +105,8 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
+        logger.info(msg)
+        logger.info(msg.items())        
         for key, value in msg.items():
             if key == 'msg_data':
                 sensor_name = msg['msg_data']['name']
@@ -451,7 +453,7 @@ class BLKATPortalClient(object):
         # Get sensors on configure
         if(len(self.conf_sensors) > 0):
             conf_sensor_names = ['subarray_{}_'.format(subarray_nr) + sensor for sensor in self.conf_sensors]
-            sensors_and_values = self.io_loop.run_sync(
+            sensors_and_values = self.io_loop.uun_sync(
                 lambda: self._get_sensor_values(product_id, conf_sensor_names))
             for sensor_name, details in sensors_and_values.items():
                 key = "{}:{}".format(product_id, sensor_name)
@@ -469,12 +471,15 @@ class BLKATPortalClient(object):
             # Complete the CBF sensor names with the CBF component name.
             cbf_sensor_prefix = '{}_{}_'.format(self.cbf_name, cbf_prefix)
             cbf_conf_sensor_names = [cbf_sensor_prefix + sensor for sensor in self.cbf_conf_sensors]
-            # Get CBF sensors and write to redis. 
-            sensors_and_values = self.io_loop.run_sync(
-                lambda: self._get_sensor_values(product_id, cbf_conf_sensor_names))
-            for sensor_name, details in sensors_and_values.items():
-                key = "{}:{}".format(product_id, sensor_name)
-                write_pair_redis(self.redis_server, key, details['value'])
+            # Get CBF sensors and write to redis.
+            try:
+                sensors_and_values = self.io_loop.run_sync(
+                    lambda: self._get_sensor_values(product_id, cbf_conf_sensor_names), timeout = 5)
+                for sensor_name, details in sensors_and_values.items():
+                    key = "{}:{}".format(product_id, sensor_name)
+                    write_pair_redis(self.redis_server, key, details['value'])
+            except:
+                logger.error("Could not retrieve once-off CBF sensors")
             # Calculate antenna-to-Fengine mapping
             antennas, feng_ids = self.antenna_mapping(product_id, cbf_sensor_prefix)
             write_pair_redis(self.redis_server, '{}:antenna_names'.format(product_id), antennas)
@@ -483,11 +488,14 @@ class BLKATPortalClient(object):
         if(len(self.stream_conf_sensors) > 0):
             stream_conf_sensors = ['subarray_{}_streams_{}_{}'.format(subarray_nr, cbf_prefix, sensor) 
                                   for sensor in self.stream_conf_sensors]
-            sensors_and_values = self.io_loop.run_sync(
-                lambda: self._get_sensor_values(product_id, stream_conf_sensors))
-            for sensor_name, details in sensors_and_values.items():
-                key = "{}:{}".format(product_id, sensor_name)
-                write_pair_redis(self.redis_server, key, details['value'])
+            try:
+                sensors_and_values = self.io_loop.run_sync(
+                    lambda: self._get_sensor_values(product_id, stream_conf_sensors), timeout = 5)
+                for sensor_name, details in sensors_and_values.items():
+                    key = "{}:{}".format(product_id, sensor_name)
+                    write_pair_redis(self.redis_server, key, details['value'])
+            except: 
+                logger.error("Could not retrieve once-off stream sensors")
         # Indicate to anyone listening that the configure process is complete. 
         publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 'conf_complete:{}'.format(product_id))
 
@@ -558,11 +566,14 @@ class BLKATPortalClient(object):
         """
         # Once-off sensors to query on ?capture_done
         sensors_to_query = []  # TODO: add sensors to query on ?capture_done
-        sensors_and_values = self.io_loop.run_sync(
-            lambda: self._get_sensor_values(product_id, sensors_to_query))
-        for sensor_name, value in sensors_and_values.items():
-            key = "{}:{}".format(product_id, sensor_name)
-            write_pair_redis(self.redis_server, key, repr(value))
+        try:
+            sensors_and_values = self.io_loop.run_sync(
+                lambda: self._get_sensor_values(product_id, sensors_to_query))
+            for sensor_name, value in sensors_and_values.items():
+                key = "{}:{}".format(product_id, sensor_name)
+                write_pair_redis(self.redis_server, key, repr(value))
+        except:
+            logger.error("Could not retrieve once-off sensors: capture-done")
 
     def _deconfigure(self, product_id):
         """Responds to deconfigure request
@@ -574,11 +585,14 @@ class BLKATPortalClient(object):
             None
         """
         sensors_to_query = []  # TODO: add sensors to query on ?deconfigure
-        sensors_and_values = self.io_loop.run_sync(
-            lambda: self._get_sensor_values(product_id, sensors_to_query))
-        for sensor_name, value in sensors_and_values.items():
-            key = "{}:{}".format(product_id, sensor_name)
-            write_pair_redis(self.redis_server, key, repr(value))
+        try:
+            sensors_and_values = self.io_loop.run_sync(
+                lambda: self._get_sensor_values(product_id, sensors_to_query))
+            for sensor_name, value in sensors_and_values.items():
+                key = "{}:{}".format(product_id, sensor_name)
+                write_pair_redis(self.redis_server, key, repr(value))
+        except:   
+            logger.error("Could not retrieve once-off sensors: capture-done")
         if product_id not in self.subarray_katportals:
             logger.warning("Failed to deconfigure a non-existent product_id: {}".format(product_id))
         else:
