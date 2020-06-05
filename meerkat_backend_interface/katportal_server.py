@@ -453,11 +453,14 @@ class BLKATPortalClient(object):
         # Get sensors on configure
         if(len(self.conf_sensors) > 0):
             conf_sensor_names = ['subarray_{}_'.format(subarray_nr) + sensor for sensor in self.conf_sensors]
-            sensors_and_values = self.io_loop.run_sync(
-                lambda: self._get_sensor_values(product_id, conf_sensor_names))
-            for sensor_name, details in sensors_and_values.items():
-                key = "{}:{}".format(product_id, sensor_name)
-                write_pair_redis(self.redis_server, key, details['value'])
+            try:
+                sensors_and_values = self.io_loop.run_sync(
+                    lambda: self._get_sensor_values(product_id, conf_sensor_names))
+                for sensor_name, details in sensors_and_values.items():
+                    key = "{}:{}".format(product_id, sensor_name)
+                    write_pair_redis(self.redis_server, key, details['value'])
+            except:
+                logger.error("Could not retrieve once-off config sensors")
         # Get CBF component name (in case it has changed to CBF_DEV_[product_id] 
         # instead of CBF_[product_id])
         key = '{}:subarray_{}_{}'.format(product_id, subarray_nr, 'pool_resources')
