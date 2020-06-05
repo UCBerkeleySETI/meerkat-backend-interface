@@ -48,7 +48,7 @@ stream_sensors:
 - antenna_channelised_voltage_input_data_suspect
 
 stream_sensors_on_configure:
-- antenna_channelised_voltage_centre_frequency
+- antenna_channelised_voltage_centre_freq
 
 array_sensors:
 - observation_activity
