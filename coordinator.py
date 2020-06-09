@@ -236,11 +236,20 @@ def cli():
                       help='Redis port to connect to', default=6379)
     parser.add_option('-c', '--config', dest='cfg_file', type=str,
                       help='Config filename (yaml)', default = 'config.yml')
+    parser.add_option('-t', '--triggermode', dest='triggermode', type=str,
+                      help="""Trigger mode: 
+                                  \'idle\': PKTSTART will not be sent.
+                                  \'auto\': PKTSTART will be sent each 
+                                      time a target is tracked.
+                                  \'armed\': PKTSTART will only be sent for the next target. 
+                                      Thereafter, the state will transition to idle.'
+                           """,
+                      default = 'auto')
     (opts, args) = parser.parse_args()
     # if not opts.port:
     #     print "MissingArgument: Port number"
     #     sys.exit(-1)
-    main(port=opts.port, cfg_file=opts.cfg_file)
+    main(port=opts.port, cfg_file=opts.cfg_file, triggermode=opts.triggermode)
 
 def configure(cfg_file):
     """Configure the coordinator according to .yml config file.
@@ -347,7 +356,7 @@ def target_name(target_string, length, delimiter = "|"):
     target = target[0:length]
     return(target)
 
-def main(port, cfg_file):
+def main(port, cfg_file, triggermode):
     # Refactor this in future.
     # For further information on the Hashpipe-Redis gateway messages, please see
     # appendix B in https://arxiv.org/pdf/1906.07391.pdf
@@ -359,6 +368,7 @@ def main(port, cfg_file):
         log.info('Configured from {}'.format(cfg_file))
     except:
         log.warning('Configuration not updated; old configuration might be present.')
+    log.info('Trigger mode set: {}'.format(triggermode))
     red = redis.StrictRedis(port=port, decode_responses=True)
     ps = red.pubsub(ignore_subscribe_messages=True)
     ps.subscribe(ALERTS_CHANNEL)
