@@ -12,11 +12,16 @@ import string
 from meerkat_backend_interface import redis_tools
 from meerkat_backend_interface.logger import log, set_logger
 
+# Redis channels to listen to
 ALERTS_CHANNEL = redis_tools.REDIS_CHANNELS.alerts
-SENSOR_CHANNEL = redis_tools.REDIS_CHANNELS.sensor_alerts  # Redis channels to listen to
-STREAM_TYPE = 'cbf.antenna_channelised_voltage'  # Type of stream to distribute
+SENSOR_CHANNEL = redis_tools.REDIS_CHANNELS.sensor_alerts  
+TRIGGER_CHANNEL = redis_tools.REDIS_CHANNELS.triggermode
+# Type of stream
+STREAM_TYPE = 'cbf.antenna_channelised_voltage'  
+# Hashpipe-Redis gateway domain 
 HPGDOMAIN   = 'bluse'
-PKTIDX_MARGIN = 1024 # Safety margin for setting index of first packet to record.
+# Safety margin for setting index of first packet to record.
+PKTIDX_MARGIN = 1024 
 
 def get_pkt_idx(red_server, host_key):
     """Get PKTIDX for a host (if active).
@@ -363,29 +368,47 @@ def main(port, cfg_file, triggermode):
     tracking = 0 # Store tracking state during developement
     log = set_logger(log_level = logging.DEBUG)
     log.info("Starting Coordinator")
+    # Set number of instances and streams per instance
+    # based on configuration file.
     try:
         hashpipe_instances, streams_per_instance = configure(cfg_file)
         log.info('Configured from {}'.format(cfg_file))
     except:
         log.warning('Configuration not updated; old configuration might be present.')
-    log.info('Trigger mode set: {}'.format(triggermode))
     red = redis.StrictRedis(port=port, decode_responses=True)
     ps = red.pubsub(ignore_subscribe_messages=True)
+    # Subscribe to the required Redis channels.
     ps.subscribe(ALERTS_CHANNEL)
     ps.subscribe(SENSOR_CHANNEL)
+    ps.subscribe(TRIGGER_CHANNEL)
+    # Initialise trigger mode (idle, armed or auto)
+    red.set('coordinator:trigger_mode', triggermode)
+    log.info('Trigger mode on startup: {}'.format(triggermode))
+    # Process incoming Redis messages:
     try:
         for message in ps.listen():
             # Split message only twice - the format is as follows:
-            # description_1:description_2:value
+            # message_type:description:value
+            # OR message_type:description (if there is no associated value)
             msg_parts = message['data'].split(':', 2)
             if len(msg_parts) < 2:
                 log.info("Not processing this message --> {}".format(message))
                 continue
             msg_type = msg_parts[0]
-            product_id = msg_parts[1]
-            # Channel
+            description = msg_parts[1]
+            if(len(msg_parts) > 2):
+                value = msg_parts[2]
+            # Global channel for all processing nodes
             global_chan = HPGDOMAIN + ':///set'
-            if msg_type == 'conf_complete':
+            # If trigger mode is changed on the fly:
+            if((msg_type == 'coordinator') & (description == 'trigger_mode')):
+                triggermode = value
+                red.set('coordinator:trigger_mode', value)
+                log.info('Trigger mode set to \'{}\''.format(value))
+            # If all the sensor values required on configure have been
+            # successfully fetched by the katportalserver
+            if(msg_type == 'conf_complete'):
+                product_id = description
                 log.info('New subarray built: {}'.format(product_id))
                 # Get IP offset (for ingesting fractions of the band)
                 try:
@@ -454,18 +477,28 @@ def main(port, cfg_file, triggermode):
                     pub_gateway_msg(red, local_chan, 'SCHAN', s_chan, log, True)
                     # Destination IP addresses for instance i
                     pub_gateway_msg(red, local_chan, 'DESTIP', addr_list[i], log, True)
-            if msg_type == 'deconfigure':
+            # If the current subarray is deconfigured:
+            if(msg_type == 'deconfigure'):
                 pub_gateway_msg(red, global_chan, 'DESTIP', '0.0.0.0', log, False)
                 log.info('Subarray deconfigured')
-            if msg_type == 'data-suspect':
-                mask = msg_parts[2]
+            # Handle the full data-suspect bitmask, one bit per polarisation
+            # per F-engine.
+            if(msg_type == 'data-suspect'):
+                mask = value
                 bitmask = '#{:x}'.format(int(mask, 2))
                 pub_gateway_msg(red, global_chan, 'FESTATUS', bitmask, log, False)
-            if msg_type == 'tracking':
-                if(tracking == 0):
+            # If the current subarray is on source and tracking:
+            if(msg_type == 'tracking'):
+                product_id = description
+                if((tracking == 0) & (triggermode != 'idle')):
                     # Set PKTSTART
                     pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
                     pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log, False)
+                    # If armed, reset triggermode to idle after triggering once.
+                    if(triggermode == 'armed'):
+                        triggermode = 'idle'
+                        red.set('coordinator:trigger_mode', 'idle')
+                        log.info('Triggermode set to \'idle\' from \'armed\'')
                     # RA and Dec (string form)
                     target = red.get('{}:target'.format(product_id))
                     target = target.split(',')
@@ -474,26 +507,29 @@ def main(port, cfg_file, triggermode):
                     pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, log, False)
                     pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, log, False)
                 tracking = 1 
-            if('pos_request_base' in msg_parts[1]):
+            # Update pointing coordinates:
+            if('pos_request_base' in description):
                 # RA and Dec (in degrees)
-                if('dec' in msg_parts[1]):
-                    dec_deg = msg_parts[2]
+                if('dec' in description):
+                    dec_deg = value
                     pub_gateway_msg(red, global_chan, 'DEC', dec_deg, log, False)
-                elif('ra' in msg_parts[1]):    
+                elif('ra' in description):    
                     # pos_request_base_ra value is given in hrs (single float value)
-                    ra_hrs = msg_parts[2]
+                    ra_hrs = value
                     ra_deg = float(ra_hrs)*15.0 # Convert to degrees
                     pub_gateway_msg(red, global_chan, 'RA', ra_deg, log, False)
                 # Azimuth and elevation (in degrees):
-                elif('azim' in msg_parts[1]):
-                    az = msg_parts[2]
+                elif('azim' in description):
+                    az = value
                     pub_gateway_msg(red, global_chan, 'AZ', az, log, False)
-                elif('elev' in msg_parts[1]):
-                    el = msg_parts[2]
+                elif('elev' in description):
+                    el = value
                     pub_gateway_msg(red, global_chan, 'EL', el, log, False)
-            if('target' in msg_parts[1]):
-                target = target_name(msg_parts[2], 68, "|")
-                pub_gateway_msg(red, global_chan, 'SRC_NAME', target, log, False)    
+            # Update target name:
+            if('target' in description):
+                target = target_name(value, 68, "|")
+                pub_gateway_msg(red, global_chan, 'SRC_NAME', target, log, False)  
+            # When a source is no longer being tracked:  
             if msg_type == 'not-tracking':
                 if(tracking == 1):
                     # For the moment during testing, get dwell time from one of the hosts.

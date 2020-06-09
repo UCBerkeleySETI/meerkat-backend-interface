@@ -1,11 +1,15 @@
 from .logger import log
 
-
 class REDIS_CHANNELS:
     """The redis channels that may be published to"""
+    # General alerts channel - observation stage signals from CAM
+    # are published here (such as "configure", "capture-start", etc).
     alerts = "alerts"
-    sensor_alerts = "sensor_alerts" # Channel for sensor vals (for immediate update on change). 
-
+    # Channel for sensor values (for immediate update on change). 
+    sensor_alerts = "sensor_alerts" 
+    # Channel for controlling the coordinator's trigger mode (idle,
+    # armed or auto - see coordinator for a more detailed explanation).
+    triggermode = "coordinator:trigger_mode"
 
 def write_pair_redis(server, key, value, expiration=None):
     """Creates a key-value pair self.redis_server's redis-server.
@@ -31,7 +35,6 @@ def write_pair_redis(server, key, value, expiration=None):
         log.error("Failed to create redis key/value pair")
         return False
 
-
 def write_list_redis(server, key, values):
     """Creates a new list and rpushes values to it
 
@@ -55,7 +58,6 @@ def write_list_redis(server, key, values):
     except:
         log.error("Failed to rpush to {}".format(key))
         return False
-
 
 def publish_to_redis(server, channel, message):
     """Publishes a message to a channel in self.redis_server's redis-server.
