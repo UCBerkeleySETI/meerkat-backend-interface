@@ -1,5 +1,8 @@
 # Redis Documentation
+
 *The information made available by this interface and the format within which it is stored in redis*
+
+The [redis-py](https://github.com/andymccurdy/redis-py) python module is used in the `meerkat-backend-interface`.
 
 # Key-Value Pairs
 *Key-value pairs created by the different modules.*
