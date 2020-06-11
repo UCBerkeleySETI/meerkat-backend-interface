@@ -365,7 +365,6 @@ def main(port, cfg_file, triggermode):
     # Refactor this in future.
     # For further information on the Hashpipe-Redis gateway messages, please see
     # appendix B in https://arxiv.org/pdf/1906.07391.pdf
-    tracking = 0 # Store tracking state during developement
     log = set_logger(log_level = logging.DEBUG)
     log.info("Starting Coordinator")
     # Set number of instances and streams per instance
@@ -409,6 +408,7 @@ def main(port, cfg_file, triggermode):
             # successfully fetched by the katportalserver
             if(msg_type == 'conf_complete'):
                 product_id = description
+                tracking = 0 # Initialise tracking state to 0
                 log.info('New subarray built: {}'.format(product_id))
                 # Get IP offset (for ingesting fractions of the band)
                 try:

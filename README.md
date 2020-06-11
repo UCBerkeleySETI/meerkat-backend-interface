@@ -13,17 +13,17 @@ This repository contains the `KATCP Server`, `Katportal Client` and `Coordinator
 
 Once acquired, the `Coordinator` publishes the appropriate commands to the processing nodes via the Hashpipe-Redis gateway. 
 
-[Installation](docs/Installation.md)
-[KATCP Server](docs/KATCP_server.md)
-[KATPortal Server](docs/KATPortal_server.md)
-[Coordinator](docs/Coordinator.md)
-[Redis Documentation](docs/Redis_Documentation.md)
+* [Installation](docs/Installation.md)
+* [KATCP Server](docs/KATCP_server.md)
+* [KATPortal Server](docs/KATPortal_server.md)
+* [Coordinator](docs/Coordinator.md)
+* [Redis Documentation](docs/Redis_Documentation.md)
 
 Other repositories that may be useful:
 
-[meerkat-reconfig](https://github.com/danielczech/meerkat-reconfig) - A tool to resend the most recent observation configuration information to specified hosts (processing nodes). Useful when debugging.
+* [meerkat-reconfig](https://github.com/danielczech/meerkat-reconfig) - A tool to resend the most recent observation configuration information to specified hosts (processing nodes). Useful when debugging.
 
-[CAMcorder](https://github.com/danielczech/CAMcorder) - A tool to record and replay Redis commands in sequence; also useful when debugging. 
+* [CAMcorder](https://github.com/danielczech/CAMcorder) - A tool to record and replay Redis commands in sequence; also useful when debugging. 
 
 ###  Diagram of the Breakthrough Listen MeerKAT Backend Interface
 
