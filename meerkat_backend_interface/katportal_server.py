@@ -417,11 +417,13 @@ class BLKATPortalClient(object):
         Returns:
             None.
         """
+        # Increase the timeout by this factor on each subsquent attempt.
+        timeout_factor = 0.5 
         for i in range(retries):
             try:
                 sensors_and_values = self.io_loop.run_sync(
                     lambda: self._get_sensor_values(product_id, sensor_names), 
-                    timeout = sync_timeout)
+                    timeout = sync_timeout + int(sync_timeout*timeout_factor*i))
                 for sensor_name, details in sensors_and_values.items():
                     key = "{}:{}".format(product_id, sensor_name)
                     write_pair_redis(self.redis_server, key, details['value'])
@@ -483,7 +485,7 @@ class BLKATPortalClient(object):
         # Get sensors on configure
         if(len(self.conf_sensors) > 0):
             conf_sensor_names = ['subarray_{}_'.format(subarray_nr) + sensor for sensor in self.conf_sensors]
-            self.fetch_once(conf_sensor_names, product_id, 3, 5)
+            self.fetch_once(conf_sensor_names, product_id, 3, 30)
         # Get CBF component name (in case it has changed to CBF_DEV_[product_id] 
         # instead of CBF_[product_id])
         key = '{}:subarray_{}_{}'.format(product_id, subarray_nr, 'pool_resources')
@@ -498,7 +500,7 @@ class BLKATPortalClient(object):
             cbf_sensor_prefix = '{}_{}_'.format(self.cbf_name, cbf_prefix)
             cbf_conf_sensor_names = [cbf_sensor_prefix + sensor for sensor in self.cbf_conf_sensors]
             # Get CBF sensors and write to redis.
-            self.fetch_once(cbf_conf_sensor_names, product_id, 3, 5)
+            self.fetch_once(cbf_conf_sensor_names, product_id, 3, 30)
             # Calculate antenna-to-Fengine mapping
             antennas, feng_ids = self.antenna_mapping(product_id, cbf_sensor_prefix)
             write_pair_redis(self.redis_server, '{}:antenna_names'.format(product_id), antennas)
@@ -507,7 +509,7 @@ class BLKATPortalClient(object):
         if(len(self.stream_conf_sensors) > 0):
             stream_conf_sensors = ['subarray_{}_streams_{}_{}'.format(subarray_nr, cbf_prefix, sensor) 
                                   for sensor in self.stream_conf_sensors]
-            self.fetch_once(stream_conf_sensors, product_id, 3, 5)  
+            self.fetch_once(stream_conf_sensors, product_id, 3, 30)  
         # Indicate to anyone listening that the configure process is complete. 
         publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 'conf_complete:{}'.format(product_id))
 
@@ -542,10 +544,12 @@ class BLKATPortalClient(object):
             None
         """
         retries = 3
+        # Increase the timeout by this factor on subsequent retries
+        timeout_factor = 0.5 
         for i in range(0, retries):
             try:
                 schedule_blocks = self.io_loop.run_sync(lambda: self._get_future_targets(product_id), 
-                    timeout = 5)
+                    timeout = 30 + timeout_factor*i*30)
                 key = "{}:schedule_blocks".format(product_id)
                 write_pair_redis(self.redis_server, key, json.dumps(schedule_blocks))
                 publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, key)
