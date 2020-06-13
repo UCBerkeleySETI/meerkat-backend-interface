@@ -1,9 +1,0 @@
-# development requirements
-#flake8
-#pytest-cov
-
-./reynard/
-git+https://github.com/ska-sa/katportalclient
-
-# run-time requirements
--e .

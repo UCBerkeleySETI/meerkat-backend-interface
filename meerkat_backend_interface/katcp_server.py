@@ -130,24 +130,25 @@ ___,-| |----''    / |         `._`-.          `----
                           n_channels, streams_json, proxy_name):
         """Receive metadata for upcoming observation.
 
-        In order to allow BLUSE to make an estimate of its ability
-        to process a particular data product, this command should
-        be used to configure a BLUSE instance when a new subarray is activated.
+        This command is used to configure a BLUSE instance when a 
+        new subarray is activated.
 
         Args:
-            product_id (str): This is a name for the data product,
-                    which is a useful tag to include in the data,
-                    but should not be analysed further.
-                    For example "array_1_bc856M4k". This value will
-                    be unique across all subarrays. However, it is
-                    not a globally unique identifier for the lifetime
-                    of the telescope.  The exact same value may be provided
-                    at a later time when the same subarray is activated again.
+            product_id (str): This is the name of the current subarray,
+                    which is used when requesting sensor data specific to 
+                    components which belong to the current subarray.
+                    Eg "array_1".
+                    This name is unique across all current subarrays (no 
+                    two concurrently active subarrays will have the same name). 
+                    However, it is not a globally unique identifier for all 
+                    time. An identical name may be provided for later 
+                    activations of other subarrays. 
 
-            antennas_csv (str): A comma separated list of physical antenna names
-                    used in particular sub-array to which the data products belongs.
+            antennas_csv (str): A comma separated list of physical antenna 
+                    names used in the current subarray.
 
-            n_channels (int): The integer number of frequency channels provided by the CBF.
+            n_channels (int): The integer number of frequency channels provided
+                    by the CBF.
 
             streams_json (str) is a JSON struct containing config keys and
                     values describing the streams.  For example:
@@ -160,43 +161,44 @@ ___,-| |----''    / |         `._`-.          `----
                     'stream_name2': 'stream_address2',
                     ...},
                     ...}
-                The steam type keys indicate the source of the data and the type, e.g. cam.http.
-                stream_address will be a URI.  For SPEAD streams, the format will be
-                spead://<ip>[+<count>]:<port>, representing SPEAD stream multicast groups.
-                When a single logical stream requires too much bandwidth to accommodate
-                as a single multicast group, the count parameter indicates the number of
-                additional consecutively numbered multicast group ip addresses, and
-                sharing the same UDP port number.
+                The steam type keys indicate the source of the data and the 
+                type, e.g. a cam.http. stream_address will be a URL.  
+                For SPEAD streams, the format will be spead://<ip>[+<count>]:<port>, 
+                representing SPEAD stream multicast groups.
+                The count parameter indicates the number of additional consecutively 
+                numbered multicast group IP addresses (sharing the same UDP port 
+                number).
                 stream_name is the name used to identify the stream in CAM.
                 A Python example is shown below, for five streams:
-                One CAM stream, with type cam.http.  The camdata stream provides the
-                connection string for katportalclient (for the subarray that this
-                BLUSE instance is being configured on).
-                One F-engine stream, with type:  cbf.antenna_channelised_voltage.
-                One X-engine stream, with type:  cbf.baseline_correlation_products.
+                One CAM stream, with type cam.http. 
+                The CAM stream provides the connection string for katportalclient 
+                (for the specific subarray that this BLUSE instance is being 
+                configured for).
+                One F-engine stream, with type: cbf.antenna_channelised_voltage.
+                One X-engine stream, with type: cbf.baseline_correlation_products.
                 Two beam streams, with type: cbf.tied_array_channelised_voltage.
                 The stream names ending in x are horizontally polarised, and those
                 ending in y are vertically polarised.
 
             proxy_name (str): The CAM name for the instance of the BLUSE data
-                proxy that is being configured.  For example, "BLUSE_3".  This
-                can be used to query sensors on the correct proxy.  Note that for
-                BLUSE there will only be a single instance of the proxy in a subarray.
+                proxy that is being configured. For example, "bluse_3".
+                There will only be a single BLUSE instance of the proxy per subarray.
 
         Returns:
-            None... but replies with "ok" or "fail" and logs either info or error
+            None (responds with "ok" or "fail" and logs either info or an error).
 
         Writes:
-            - [product_id]:timestamp" -> "1534657577373.23423"  :: Redis String
-            - [product_id]:antennas" -> [1,2,3,4] :: Redis List
-            - [product_id]:n_channels" -> "4096" :: Redis String
-            - [product_id]:proxy_name "-> "BLUSE_whatever" :: Redis String
-            - [product_id]:streams" -> {....} :: Redis Hash !!!CURRENTLY A STRING!!!
+            - [product_id]:timestamp" -> "1534657577373.23423" (Redis string)
+            - [product_id]:antennas" -> [1,2,3,4] (Redis list)
+            - [product_id]:n_channels" -> "4096" (Redis string)
+            - [product_id]:proxy_name "-> "bluse_N" (Redis string)
+            - [product_id]:streams" -> {....} (Redis string)
             - current:obs:id -> [product_id]
+            - [product_id]:cbf_prefix -> (Redis string) 
 
         Publishes:
             redis-channel: 'alerts' <-- "configure"
-
+            
         Examples:
             > ?configure array_1_bc856M4k a1,a2,a3,a4 128000 {"cam.http":{"camdata":"http://monctl.devnmk.camlab.kat.ac.za/api/client/2"},"stream_type2":{"stream_name1":"stream_address1","stream_name2":"stream_address2"}} BLUSE_3
         """
@@ -234,14 +236,11 @@ ___,-| |----''    / |         `._`-.          `----
     @request(Str())
     @return_reply()
     def request_capture_init(self, req, product_id):
-        """Signals that an observation will start soon
-
-            Publishes a message to the 'alerts' channel of the form:
-                capture-init:product_id
-            The product_id should match what what was sent in the ?configure request
-
-            This alert should notify all backend processes (such as beamformer)
-            to get ready for data
+        """Signals that an observation will start soon.
+           Publishes a message to the 'alerts' channel of the form:
+           capture-init:product_id
+           The product_id matches that which was sent in the 
+           ?configure request.
         """
         msg = "capture-init:{}".format(product_id)
         success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
@@ -253,14 +252,11 @@ ___,-| |----''    / |         `._`-.          `----
     @request(Str())
     @return_reply()
     def request_capture_start(self, req, product_id):
-        """Signals that an observation is starting now
-
+        """Signals that an observation is starting now.
             Publishes a message to the 'alerts' channel of the form:
-                capture-start:product_id
-            The product_id should match what what was sent in the ?configure request
-
-            This alert should notify all backend processes (such as beamformer)
-            that they need to be collecting data now
+            capture-start:product_id
+            The product_id matches that which was sent in the 
+            ?configure request.
         """
         msg = "capture-start:{}".format(product_id)
         success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
@@ -272,14 +268,11 @@ ___,-| |----''    / |         `._`-.          `----
     @request(Str())
     @return_reply()
     def request_capture_stop(self, req, product_id):
-        """Signals that an observation is has stopped
-
+        """Signals that an observation is has stopped.
             Publishes a message to the 'alerts' channel of the form:
-                capture-stop:product_id
-            The product_id should match what what was sent in the ?configure request
-
-            This alert should notify all backend processes (such as beamformer)
-            that they should stop collecting data now
+            capture-stop:product_id
+            The product_id matches that which was sent in the 
+            ?configure request.
         """
         msg = "capture-stop:{}".format(product_id)
         success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
@@ -291,16 +284,12 @@ ___,-| |----''    / |         `._`-.          `----
     @request(Str())
     @return_reply()
     def request_capture_done(self, req, product_id):
-        """Signals that an observation has finished
-
+        """Signals that an observation has finished.
             Publishes a message to the 'alerts' channel of the form:
-                capture-done:product_id
-            The product_id should match what what was sent in the ?configure request
-
-            This alert should notify all backend processes (such as beamformer)
-            that their data streams are ending
+            capture-done:product_id
+            The product_id matches that which was sent in the 
+            ?configure request.
         """
-
         msg = "capture-done:{}".format(product_id)
         success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
         if success:
@@ -311,21 +300,22 @@ ___,-| |----''    / |         `._`-.          `----
     @request(Str())
     @return_reply()
     def request_deconfigure(self, req, product_id):
-        """Signals that the current data product is done.
+        """Signals that the current subarray has been deconfigured (dismantled)
+           and its associated components released for use in another subarray.
 
-            Deconfigure the BLUSE instance that was created by the call
-            to ?configure with the corresponding product_id. Note:  CAM is
-            expected to have sent a ?capture-done request before deconfiguring,
-            in order to ensure that all data has been written. If BLUSE uses an
-            instance of katportalclient to get information from CAM for this
-            BLUSE instance, then it should disconnect at this time.
+           This is the signal to deconfigure the BLUSE instance associated with 
+           the current subarray (and which was created by the call to ?configure 
+           with the corresponding product_id). 
+           Note: CAM is expected to have sent a ?capture-done request before 
+           deconfiguring. If BLUSE uses an instance of katportalclient to get 
+           information from CAM for the current subarray, it should disconnect.
 
-            Publishes a message to the 'alerts' channel of the form:
-                deconfigure:product_id
-            The product_id should match what what was sent in the ?configure request
+           Publishes a message to the 'alerts' channel of the form:
+           deconfigure:product_id
+           The product_id matches that which was sent in the ?configure request.
 
-            This alert should notify all backend processes (such as beamformer)
-            that their data streams are ending
+           Other backend processes (such as beamformer) should be notified 
+           that their data streams are ending.
         """
         msg = "deconfigure:{}".format(product_id)
         success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
@@ -335,13 +325,14 @@ ___,-| |----''    / |         `._`-.          `----
             return ("fail", "Failed to publish to our local redis server")
 
     def setup_sensors(self):
+        # TODO: Need to re-look at this function.
         """
         @brief    Set up monitoring sensors.
 
-        @note     The following sensors are made available on top of defaul sensors
+        @note     The following sensors are made available on top of default sensors
                   implemented in AsynDeviceServer and its base classes.
 
-                  device-status:      Reports the health status of the FBFUSE and associated devices:
+                  device-status:      Reports the health status of the proxy and associated devices:
                                       Among other things report HW failure, SW failure and observation failure.
         """
         self._device_status = Sensor.discrete(
@@ -367,14 +358,12 @@ ___,-| |----''    / |         `._`-.          `----
         self.add_sensor(self._version)
 
     def request_halt(self, req, msg):
-        """Halts the server, logs to syslog and slack, and exits the program
-        Returns
-        -------
-        success : {'ok', 'fail'}
-            Whether scheduling the halt succeeded.
-        Examples
-        --------
-        ::
+        """Halts the server, writes to the log, and exits the program.
+        
+        Returns:
+            success : {'ok', 'fail'} (whether scheduling the halt succeeded).
+
+        Examples:
             ?halt
             !halt ok
 
@@ -394,7 +383,6 @@ ___,-| |----''    / |         `._`-.          `----
             raise AsyncReply
         self.ioloop.add_callback(lambda: chain_future(_halt(), f))
         log.critical("HALTING SERVER!!!")
-        # TODO: uncomment when you deploy
         # notify_slack("KATCP server at MeerKAT has halted. Might want to check that!")
         sys.exit(0)
 
