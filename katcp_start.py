@@ -57,7 +57,6 @@ def main(ip, port, debug):
         log_level = logging.DEBUG
     else:
         log_level = logging.INFO
-
     log = set_logger(log_level=log_level)
     log.info("Starting BLBackendInterface instance")
     ioloop = tornado.ioloop.IOLoop.current()

@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import tornado.gen
-import uuid
 from katportalclient import KATPortalClient
 from katportalclient.client import SensorNotFoundError
 import redis
@@ -34,13 +33,14 @@ class BLKATPortalClient(object):
 
     When start() is called, a loop starts that subscribes to the 'alerts'
     channel of the Redis server. Depending on the message received, various
-    processes are run. These include:
+    tasks are performed. These include:
         1. Creating a new KATPortalClient object specific to the
-            product id just received in a ?configure request.
+            product ID just received in a ?configure request.
         2. Querying for schedule block information when ?capture-init is
             received and publishing this to Redis.
-        3. Querying for target information when ?capture-start is
-            received and publishing this to Redis.
+        3. Subscribing to various sensors for asynchronous (and immediate)
+            updates upon receiving ?capture-start and publishing the 
+            resultant information to Redis pub/sub channels.
         4. Deleting the corresponding KATPortalClient object when
             a ?deconfigure request is sent.
 
@@ -538,7 +538,8 @@ class BLKATPortalClient(object):
         """Responds to capture-init request by getting schedule blocks
 
         Args:
-            product_id (str): the product id given in the ?configure request
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
 
         Returns:
             None
@@ -565,7 +566,8 @@ class BLKATPortalClient(object):
         """Responds to capture-start request
 
         Args:
-            product_id (str): the product id given in the ?configure request
+            product_id (str): the name of the current subarray provided in the
+            ?configure request.
 
         Returns:
             None
@@ -582,10 +584,11 @@ class BLKATPortalClient(object):
         """Responds to capture-done request
 
         Args:
-            product_id (str): the product id given in the ?configure request
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
 
         Returns:
-            None, but does many things!
+            None
         """
         # Once-off sensors to query on ?capture_done
         # Uncomment below to add sensors for query.
@@ -597,7 +600,8 @@ class BLKATPortalClient(object):
         """Responds to deconfigure request
 
         Args:
-            product_id (str): the product id given in the ?configure request
+            product_id (str): the name of the current subarray provided in 
+            the ?configure request.
 
         Returns:
             None
@@ -616,7 +620,8 @@ class BLKATPortalClient(object):
         """Builds the list of sensors for subscription.
 
         Args:
-            product_id (str): the product id given in the ?configure request.
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
 
         Returns:
             sensors_for_update (list): list of full sensor names for subscription.
@@ -639,10 +644,11 @@ class BLKATPortalClient(object):
         return sensors_for_update
 
     def _capture_stop(self, product_id):
-        """Responds to capture-stop request
+        """Responds to capture-stop request.
 
         Args:
-            product_id (str): the product id given in the ?configure request
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
 
         Returns:
             None
@@ -654,10 +660,11 @@ class BLKATPortalClient(object):
         pass
  
     def _other(self, product_id):
-        """This is called when an unrecognized request is sent
+        """This is called when an unrecognized request is sent.
 
         Args:
-            product_id (str): the product id given in the ?configure request
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
 
         Returns:
             None
@@ -668,7 +675,8 @@ class BLKATPortalClient(object):
         """Called when sensor values for acquisition on configure have been acquired.
         
         Args: 
-            product_id (str): the product ID given in the configure request.
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
 
         Returns:
             None
@@ -677,13 +685,14 @@ class BLKATPortalClient(object):
 
     @tornado.gen.coroutine
     def _get_future_targets(self, product_id):
-        """Gets the schedule blocks of the product_id's subarray
+        """Gets the schedule blocks of the product_id's subarray.
 
         Args:
-            product_id (str): the product id of a currently activated subarray
+            product_id (str): the name of the current subarray provided in 
+            the ?configure request.
 
         Returns:
-            List of dictionaries containing schedule block information
+            List of dictionaries containing schedule block information.
 
         Examples:
             >>> self.io_loop.run_sync(lambda: self._get_future_targets(product_id))
@@ -700,11 +709,12 @@ class BLKATPortalClient(object):
 
     @tornado.gen.coroutine
     def _get_sensor_values(self, product_id, targets):
-        """Gets sensor values associated with the product_id's subarray
+        """Gets sensor values associated with the current subarray.
 
         Args:
-            product_id (str): the product id of a currently activated subarray
-            targets (list): expressions to look for in sensor names
+            product_id (str): the name of the current subarray provided in 
+            the ?configure request.
+            targets (list): expressions to look for in sensor names.
 
         Returns:
             A dictionary of sensor-name / value pairs
@@ -780,7 +790,7 @@ class BLKATPortalClient(object):
 |                                                   |
 |                KATPortal Client                   |
 |                                                   |
-|                 Version: {}                      |
+|                 Version: {}                       |
 |                                                   |
 |  github.com/danielczech/meerkat-backend-interface |
 |  github.com/ejmichaud/meerkat-backend-interface   |

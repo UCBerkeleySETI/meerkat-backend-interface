@@ -1,27 +1,33 @@
 from .logger import log
 
 class REDIS_CHANNELS:
-    """The redis channels that may be published to"""
-    # General alerts channel - observation stage signals from CAM
-    # are published here (such as "configure", "capture-start", etc).
+    """Redis channels for communication between processes.
+    
+    alerts: General alerts channel - observation stage signals from
+            CAM are published here (such as "configure:array_1").
+
+    sensor_alerts: Channel for asynchronously updated sensor values.
+
+    triggermode: Channel for controlling the coordinator's trigger 
+                 mode (idle, armed or auto - see coordinator for a 
+                 more detailed explanation).
+    """
     alerts = "alerts"
-    # Channel for sensor values (for immediate update on change). 
     sensor_alerts = "sensor_alerts" 
-    # Channel for controlling the coordinator's trigger mode (idle,
-    # armed or auto - see coordinator for a more detailed explanation).
     triggermode = "coordinator:trigger_mode"
 
 def write_pair_redis(server, key, value, expiration=None):
-    """Creates a key-value pair self.redis_server's redis-server.
+    """Writes a key-value pair to Redis.
 
     Args:
-        server (redis.StrictRedis) a redis-py redis server object
-        key (str): the key of the key-value pair
-        value (str): the value of the key-value pair
-        expiration (number): number of seconds before key expiration
+        server (redis.StrictRedis): A redis-py Redis server object.
+        key (str): The key of the key-value pair.
+        value (str): The value of the key-value pair.
+        expiration (int): Number of seconds before key expiration.
 
     Returns:
-        True if success, False otherwise, and logs either an 'debug' or 'error' message
+        True if success, False otherwise, and logs either a 'debug' 
+        or an 'error' message.
 
     Examples:
         >>> server = BLBackendInterface('localhost', 5000)
@@ -36,18 +42,18 @@ def write_pair_redis(server, key, value, expiration=None):
         return False
 
 def write_list_redis(server, key, values):
-    """Creates a new list and rpushes values to it
+    """Creates a new Redis list and rpushes values to it. If a list 
+       already exists at the given key, then delete it and rpush values 
+       to a new empty list.
 
-        If a list already exists at the given key, then
-        delete it and rpush values to a new empty list
+       Args:
+           server (redis.StrictRedis): A redis-py redis server object.
+           key (str): Key identifying the list.
+           values (list): List of values to rpush to redis list.
 
-        Args:
-            server (redis.StrictRedis) a redis-py redis server object
-            key (str): key identifying the list
-            values (list): list of values to rpush to redis list
-
-        Returns:
-            True if success, False otherwise, and logs either an 'debug' or 'error' message
+       Returns:
+           True if success, False otherwise, and logs either an 'debug' 
+           or 'error' message.
     """
     try:
         if server.exists(key):
@@ -60,15 +66,17 @@ def write_list_redis(server, key, values):
         return False
 
 def publish_to_redis(server, channel, message):
-    """Publishes a message to a channel in self.redis_server's redis-server.
+    """Publishes a message to a redis pub/sub channel associated with 
+       a specified Redis server.
 
     Args:
-        server (redis.StrictRedis) a redis-py redis server object
-        channel (str): the name of the channel to publish to
-        message (str): the message to be published
+        server (redis.StrictRedis): A redis-py redis server object.
+        channel (str): The name of the channel to publish to.
+        message (str): The message to be published.
 
     Returns:
-        True if success, False otherwise, and logs either an 'debug' or 'error' message
+        True if success, False otherwise, and logs either an 'debug' 
+        or 'error' message.
 
     Examples:
         >>> server = BLBackendInterface('localhost', 5000)
