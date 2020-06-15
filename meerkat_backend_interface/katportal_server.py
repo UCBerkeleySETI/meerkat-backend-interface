@@ -421,12 +421,8 @@ class BLKATPortalClient(object):
         timeout_factor = 0.5 
         for i in range(retries):
             try:
-                sensors_and_values = self.io_loop.run_sync(
-                    lambda: self._get_sensor_values(product_id, sensor_names), 
+                self.io_loop.run_sync(lambda: self._get_sensor_values(product_id, sensor_names), 
                     timeout = sync_timeout + int(sync_timeout*timeout_factor*i))
-                for sensor_name, details in sensors_and_values.items():
-                    key = "{}:{}".format(product_id, sensor_name)
-                    write_pair_redis(self.redis_server, key, details['value'])
                 # If sensors succesfully queried and written to Redis, break.
                 break 
             except:
@@ -434,6 +430,7 @@ class BLKATPortalClient(object):
         # If retried <retries> times, then log an error.
         if(i == (retries - 1)):
             logger.error("Could not retrieve once-off sensors: {} attempts, giving up.".format(retries)) 
+            logger.error("{} could not be retrieved.".format(sensor_names))
 
     def _configure(self, product_id):
         """Executes when configure request is processed
@@ -709,7 +706,8 @@ class BLKATPortalClient(object):
 
     @tornado.gen.coroutine
     def _get_sensor_values(self, product_id, targets):
-        """Gets sensor values associated with the current subarray.
+        """Gets sensor values associated with the current subarray and
+        writes them to the Redis database.
 
         Args:
             product_id (str): the name of the current subarray provided in 
@@ -717,12 +715,11 @@ class BLKATPortalClient(object):
             targets (list): expressions to look for in sensor names.
 
         Returns:
-            A dictionary of sensor-name / value pairs
+            None
 
         Examples:
             >>> self.io_loop.run_sync(lambda: self._get_sensor_values(product_id, ["target", "ra", "dec"]))
         """
-        sensors_and_values = dict()
         if not targets:
             logger.warning("Sensor list empty. Not querying katportal...")
             raise tornado.gen.Return(sensors_and_values)
@@ -734,11 +731,12 @@ class BLKATPortalClient(object):
             for sensor_name in sensor_names:
                 try:
                     sensor_value = yield client.sensor_value(sensor_name, include_value_ts=True)
-                    sensors_and_values[sensor_name] = self._convert_SensorSampleValueTime_to_dict(sensor_value)
-                except SensorNotFoundError as exc:
-                    print("\n", exc)
+                    details = self._convert_SensorSampleValueTime_to_dict(sensor_value)
+                    key = "{}:{}".format(product_id, sensor_name)
+                    write_pair_redis(self.redis_server, key, details['value'])
+                except Exception as e:
+                    logger.error(e)
                     continue
-        raise tornado.gen.Return(sensors_and_values)
 
     def _convert_SensorSampleValueTime_to_dict(self, sensor_value):
         """Converts the named-tuple object returned by sensor_value
