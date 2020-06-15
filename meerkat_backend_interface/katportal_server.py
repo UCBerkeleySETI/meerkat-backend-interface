@@ -21,7 +21,7 @@ from .redis_tools import (
     publish_to_redis
     )
     
-from .logger import log as logger
+from .logger import log 
 
 class BLKATPortalClient(object):
     """Client server to KATPortal. Once initialized, the client creates 
@@ -88,7 +88,7 @@ class BLKATPortalClient(object):
             msg_data = msg['data']
             msg_parts = msg_data.split(':')
             if len(msg_parts) != 2:
-                logger.info("Not processing this message --> {}".format(message))
+                log.info("Not processing this message --> {}".format(message))
                 continue
             msg_type = msg_parts[0]
             product_id = msg_parts[1]
@@ -105,8 +105,8 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        logger.info(msg)
-        logger.info(msg.items())        
+        log.info(msg)
+        log.info(msg.items())        
         for key, value in msg.items():
             if key == 'msg_data':
                 sensor_name = msg['msg_data']['name']
@@ -223,7 +223,7 @@ class BLKATPortalClient(object):
         if(np.sum(mask) <= n_stragglers):
             consensus = True
         else:
-            logger.info('Consensus for {} not reached'.format(sensor))
+            log.info('Consensus for {} not reached'.format(sensor))
         return consensus, mask
 
     def antenna_consensus(self, product_id, sensor_name):
@@ -258,7 +258,7 @@ class BLKATPortalClient(object):
                     publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, 
                     '{}:{}:unavailable'.format(product_id, sensor_name))
             else:
-                logger.warning("Antennas do not show consensus for sensor: {}".format(sensor_name))
+                log.warning("Antennas do not show consensus for sensor: {}".format(sensor_name))
         except:
             # If any of the sensors are not available:
             publish_to_redis(self.redis_server, REDIS_CHANNELS.sensor_alerts, '{}:{}:unavailable'.format(product_id, sensor_name))
@@ -332,9 +332,9 @@ class BLKATPortalClient(object):
                     cfg['stream_sensors'], cfg['cbf_sensors'], cfg['sensors_on_configure'],
                     cfg['array_sensors'], cfg['stream_sensors_on_configure'])
                 except yaml.YAMLError as E:
-                    logger.error(E)
+                    log.error(E)
         except IOError:
-            logger.error('Config file not found')
+            log.error('Config file not found')
 
     @tornado.gen.coroutine
     def subscription(self, sub, product_id, sensor_list):
@@ -426,11 +426,11 @@ class BLKATPortalClient(object):
                 # If sensors succesfully queried and written to Redis, break.
                 break 
             except:
-                logger.warning("Could not retrieve once-off sensors: attempt {} of {}".format(i + 1, retries))
+                log.warning("Could not retrieve once-off sensors: attempt {} of {}".format(i + 1, retries))
         # If retried <retries> times, then log an error.
         if(i == (retries - 1)):
-            logger.error("Could not retrieve once-off sensors: {} attempts, giving up.".format(retries)) 
-            logger.error("{} could not be retrieved.".format(sensor_names))
+            log.error("Could not retrieve once-off sensors: {} attempts, giving up.".format(retries)) 
+            log.error("{} could not be retrieved.".format(sensor_names))
 
     def _configure(self, product_id):
         """Executes when configure request is processed
@@ -465,14 +465,14 @@ class BLKATPortalClient(object):
             if(cbf_sensors is not None):
                 self.cbf_sensors = []
                 self.cbf_sensors.extend(cbf_sensors)
-            logger.info('Configuration updated')
+            log.info('Configuration updated')
         except:
-            logger.warning('Configuration not updated; old configuration might be present.')
+            log.warning('Configuration not updated; old configuration might be present.')
         cam_url = self.redis_server.get("{}:{}".format(product_id, 'cam:url'))
         client = KATPortalClient(cam_url, on_update_callback=partial(self.on_update_callback_fn, product_id), logger=logger)
         #client = KATPortalClient(cam_url, on_update_callback=lambda x: self.on_update_callback_fn(product_id), logger=logger)
         self.subarray_katportals[product_id] = client
-        logger.info("Created katportalclient object for : {}".format(product_id))
+        log.info("Created katportalclient object for : {}".format(product_id))
         subarray_nr = product_id[-1]
         ant_key = '{}:antennas'.format(product_id) 
         ant_list = self.redis_server.lrange(ant_key, 0, self.redis_server.llen(ant_key))
@@ -554,10 +554,10 @@ class BLKATPortalClient(object):
                 # If success, break.
                 break
             except:
-                logger.warning("Could not retrieve schedule blocks: attempt {} of {}".format(i + 1, retries))
+                log.warning("Could not retrieve schedule blocks: attempt {} of {}".format(i + 1, retries))
         # If retried <retries> times, then log an error.
         if(i == (retries - 1)):
-            logger.error("Could not retrieve schedule blocks: {} attempts, giving up.".format(retries))
+            log.error("Could not retrieve schedule blocks: {} attempts, giving up.".format(retries))
 
     def _capture_start(self, product_id):
         """Responds to capture-start request
@@ -608,10 +608,10 @@ class BLKATPortalClient(object):
         #sensors_to_query = [] 
         #self.fetch_once(sensors_to_query, product_id, 3, 5)  
         if product_id not in self.subarray_katportals:
-            logger.warning("Failed to deconfigure a non-existent product_id: {}".format(product_id))
+            log.warning("Failed to deconfigure a non-existent product_id: {}".format(product_id))
         else:
             self.subarray_katportals.pop(product_id)
-            logger.info("Deleted KATPortalClient instance for product_id: {}".format(product_id))
+            log.info("Deleted KATPortalClient instance for product_id: {}".format(product_id))
 
     def build_sub_sensors(self, product_id):
         """Builds the list of sensors for subscription.
@@ -666,7 +666,7 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        logger.warning("Unrecognized alert : {}".format(message['data']))
+        log.warning("Unrecognized alert : {}".format(message['data']))
 
     def _conf_complete(self, product_id):
         """Called when sensor values for acquisition on configure have been acquired.
@@ -678,7 +678,7 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        logger.info("Sensor values on configure acquired for {}.".format(product_id))
+        log.info("Sensor values on configure acquired for {}.".format(product_id))
 
     @tornado.gen.coroutine
     def _get_future_targets(self, product_id):
@@ -721,12 +721,12 @@ class BLKATPortalClient(object):
             >>> self.io_loop.run_sync(lambda: self._get_sensor_values(product_id, ["target", "ra", "dec"]))
         """
         if not targets:
-            logger.warning("Sensor list empty. Not querying katportal...")
+            log.warning("Sensor list empty. Not querying katportal...")
             raise tornado.gen.Return(sensors_and_values)
         client = self.subarray_katportals[product_id]
         sensor_names = yield client.sensor_names(targets)
         if not sensor_names:
-            logger.warning("No matching sensors found!")
+            log.warning("No matching sensors found!")
         else:
             for sensor_name in sensor_names:
                 try:
@@ -735,7 +735,7 @@ class BLKATPortalClient(object):
                     key = "{}:{}".format(product_id, sensor_name)
                     write_pair_redis(self.redis_server, key, details['value'])
                 except Exception as e:
-                    logger.error(e)
+                    log.error(e)
                     continue
 
     def _convert_SensorSampleValueTime_to_dict(self, sensor_value):
