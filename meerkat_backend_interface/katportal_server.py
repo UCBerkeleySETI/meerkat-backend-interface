@@ -469,8 +469,8 @@ class BLKATPortalClient(object):
         except:
             log.warning('Configuration not updated; old configuration might be present.')
         cam_url = self.redis_server.get("{}:{}".format(product_id, 'cam:url'))
-        client = KATPortalClient(cam_url, on_update_callback=partial(self.on_update_callback_fn, product_id), logger=logger)
-        #client = KATPortalClient(cam_url, on_update_callback=lambda x: self.on_update_callback_fn(product_id), logger=logger)
+        client = KATPortalClient(cam_url, on_update_callback=partial(self.on_update_callback_fn, product_id), logger=log)
+        #client = KATPortalClient(cam_url, on_update_callback=lambda x: self.on_update_callback_fn(product_id), logger=log)
         self.subarray_katportals[product_id] = client
         log.info("Created katportalclient object for : {}".format(product_id))
         subarray_nr = product_id[-1]
@@ -487,7 +487,7 @@ class BLKATPortalClient(object):
         # instead of CBF_[product_id])
         key = '{}:subarray_{}_{}'.format(product_id, subarray_nr, 'pool_resources')
         pool_resources = self.redis_server.get(key).split(',')
-        self.cbf_name = self.component_name('cbf', pool_resources, logger)
+        self.cbf_name = self.component_name('cbf', pool_resources, log)
         key = '{}:{}'.format(product_id, 'cbf_name')
         write_pair_redis(self.redis_server, key, self.cbf_name)
         # Get CBF sensor values required on configure.
