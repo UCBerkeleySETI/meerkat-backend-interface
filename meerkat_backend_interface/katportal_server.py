@@ -48,7 +48,7 @@ class BLKATPortalClient(object):
         1. Support thread-safe stopping of ioloop
     """
 
-    VERSION = 1.0
+    VERSION = '2020-06-19'
 
     def __init__(self, config_file):
         """Our client server to the Katportal"""
@@ -793,7 +793,7 @@ class BLKATPortalClient(object):
 |                                                   |
 |                KATPortal Client                   |
 |                                                   |
-|                 Version: {}                       |
+|              Version: {}                  |
 |                                                   |
 |  github.com/danielczech/meerkat-backend-interface |
 |  github.com/ejmichaud/meerkat-backend-interface   |

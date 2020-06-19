@@ -75,8 +75,7 @@ class BLBackendInterface(AsyncDeviceServer):
         * sensor-sampling-clear (non-standard)
     """
 
-    VERSION_INFO = ("BLUSE-katcp-interface", 1, 0)
-    BUILD_INFO = ("BLUSE-katcp-implementation", 1, 0, "rc?")
+    VERSION = "2020-06-19"
     DEVICE_STATUSES = ["ok", "fail", "degraded"]
 
     def __init__(self, server_host, server_port):
@@ -122,7 +121,7 @@ ___,-| |----''    / |         `._`-.          `----
          `.`-._        _,             ,-     __,-
             `-.`.
    --'         `;
-        """.format("{}.{}".format(self.VERSION_INFO[1], self.VERSION_INFO[2]), self.port))
+        """.format(self.VERSION, self.port))
 
     @request(Str(), Str(), Int(), Str(), Str())
     @return_reply()
