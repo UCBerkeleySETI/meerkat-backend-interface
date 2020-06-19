@@ -728,15 +728,20 @@ class BLKATPortalClient(object):
         if not sensor_names:
             log.warning("No matching sensors found!")
         else:
-            for sensor_name in sensor_names:
-                try:
-                    sensor_value = yield client.sensor_value(sensor_name, include_value_ts=True)
-                    details = self._convert_SensorSampleValueTime_to_dict(sensor_value)
-                    key = "{}:{}".format(product_id, sensor_name)
-                    write_pair_redis(self.redis_server, key, details['value'])
-                except Exception as e:
-                    log.error(e)
-                    continue
+            # Query approach:
+            # Instead of sequentially querying each sensor, build a regex query
+            # and fetch them all at once at the suggestion of ebarr. 
+            # This is said to cause fewer timeout problems. 
+            query = "|".join(sensor_names)
+            try:
+                sensor_details = yield client.sensor_values(query, include_value_ts=True)
+                for sensor, details in sensor_details.items():
+                    sensor_dict = self._convert_SensorSampleValueTime_to_dict(details)
+                    redis_key = "{}:{}".format(product_id, sensor)
+                    # Only writing the sensor value (no other metadata for now)
+                    write_pair_redis(self.redis_server, redis_key, sensor_dict['value'])
+            except Exception as e:
+                log.error(e)
 
     def _convert_SensorSampleValueTime_to_dict(self, sensor_value):
         """Converts the named-tuple object returned by sensor_value
