@@ -22,6 +22,12 @@ LOG_FILE = '/var/log/bluse/katportal/katportal.err'
 PROGRESS_LOG_FILE = 'track_logs_2020-06-19.log'
 KEYSTRING = 'observation_activity'
 
+# Format matplotlib fonts:
+font = {'family' : 'normal',
+        'weight' : 'normal',
+        'size'   : 22}
+mpl.rc('font', **font)
+
 def scrape_log(logfile, keystring):
     """Retrieve timestamps and values for a log entry containing 
        a particular string.
@@ -182,6 +188,11 @@ def plot_values(s_vals, s_times, l_vals, l_times, pr_vals, pr_times):
        Returns:
            None
     """
+    
+    # Figure formatting
+    fig, ax = plt.subplots()
+    fig.subplots_adjust(bottom=0.25)
+    fig.subplots_adjust(left=0.15)
 
     # log dates to get ranges for plotting format.
     l_dates = mpl.dates.date2num(l_times)
@@ -189,7 +200,6 @@ def plot_values(s_vals, s_times, l_vals, l_times, pr_vals, pr_times):
     # It appears that in order to set the correct order of ytick 
     # items, one must actually plot and remove something to 'force'  
     # the correct order!
-    ax = plt.gca()
     states = ['unknown', 'idle', 'stop', 'slew', 'track']
     temp, = ax.plot(np.arange(np.min(l_dates), 
         np.min(l_dates) + len(states)), states)
@@ -197,31 +207,34 @@ def plot_values(s_vals, s_times, l_vals, l_times, pr_vals, pr_times):
 
     # Sensor values as visible in KATGUI sensor graph:
     s_dates = mpl.dates.date2num(s_times)
-    plt.step(s_dates, s_vals, label = 'GUI sensor graph', 
+    plt.step(s_dates, s_vals, label = 'KATGUI sensor graph', 
         linestyle = '--', color = 'green', where = 'post')
 
     # Progress log sensor values from KATGUI observations:
     pr_dates = mpl.dates.date2num(pr_times)
-    plt.step(pr_dates, pr_vals, label = 'Progress logs', 
+    plt.step(pr_dates, pr_vals, label = 'SB progress log', 
         linestyle = ':', color = 'b', where = 'post')
 
     # Sensor values as actually received by the backend:
-    plt.step(l_dates, l_vals, label = 'katportal_server logs', 
+    plt.step(l_dates, l_vals, label = 'BLUSE (received)', 
         linestyle = '-.', color = 'k', where = 'post')
 
     # Find all possible sensor states
     states = set(s_vals).union(set(l_vals)).union(set(pr_vals))
-    print(states)
+    print('States: {}'.format(states))
 
     # Plotting formatting
     ax.xaxis.set_major_formatter(mpl.dates.DateFormatter("%H:%M:%S"))
-    xlocator = mpl.dates.MinuteLocator(interval = 1)
+    xlocator = mpl.dates.SecondLocator(interval = 30)
     # Slightly hacky, but this is a script after all:
-    xlocator.MAXTICKS = 7000 
+    xlocator.MAXTICKS = 12900 
     ax.xaxis.set_major_locator(xlocator)
     plt.xticks(rotation=90)
     plt.legend(loc = 'lower left')
     plt.xlim(left = l_dates[0], right = l_dates[-1])
+    plt.title('Sensor: observation-activity')
+    plt.xlabel('Time [UTC]', labelpad=5)
+    plt.ylabel('Sensor Value', labelpad=5)
     plt.show()
 
 if(__name__ == '__main__'):
@@ -234,9 +247,7 @@ if(__name__ == '__main__'):
     # Load pre-processed logs if need be:
     with open('l_vals.txt', 'rb') as f:
         l_vals = pickle.load(f)
-        print(len(l_vals))
     with open('l_times.txt', 'rb') as f:
         l_times = pickle.load(f)
-        print(len(l_times))
 
     plot_values(s_vals, s_times, l_vals, l_times, pr_vals, pr_times)
