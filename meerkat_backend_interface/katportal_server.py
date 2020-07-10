@@ -13,6 +13,7 @@ import ast
 import json
 import numpy as np
 from datetime import datetime
+import uuid
 
 from .redis_tools import (
     REDIS_CHANNELS,
@@ -56,6 +57,7 @@ class BLKATPortalClient(object):
         self.p = self.redis_server.pubsub(ignore_subscribe_messages=True)
         self.io_loop = io_loop = tornado.ioloop.IOLoop.current()
         self.subarray_katportals = dict()  # indexed by product IDs
+        self.namespaces = dict() # indexed by product IDs
         self.config_file = config_file
         self.ant_sensors = []  # sensors required from each antenna
         self.stream_sensors = []  # stream sensors (for continuous update)
@@ -105,8 +107,6 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        log.info(msg)
-        log.info(msg.items())        
         for key, value in msg.items():
             if key == 'msg_data':
                 sensor_name = msg['msg_data']['name']
@@ -152,12 +152,13 @@ class BLKATPortalClient(object):
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
                         '{}:{}'.format('not-tracking', product_id))
-                    # Temporary solution for websocket subscription issue
                     if(sensor_value == 'stop'):
+                        # TODO: remove requirement to build sensor
+                        # list here.    
                         sensors_for_update = self.build_sub_sensors(product_id)
                         if(len(sensors_for_update) > 0):
                             self.subscription('unsubscribe', product_id, sensors_for_update)
-                        self.io_loop.stop()
+                        log.info('Unsubscribed and disconnected from {} sensors'.format(len(sensors_for_update)))
                                          
     def subarray_data_suspect(self, product_id):
         """Publish a global subarray data-suspect value by checking each
@@ -349,14 +350,19 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        yield self.subarray_katportals[product_id].connect()
         if(sub == 'subscribe'):
-            result = yield self.subarray_katportals[product_id].subscribe(namespace = product_id) 
+            self.namespaces[product_id] = '{}_{}'.format(product_id, str(uuid.uuid4()))
+            yield self.subarray_katportals[product_id].connect()
+            result = yield self.subarray_katportals[product_id].subscribe(namespace = self.namespaces[product_id]) 
             for sensor in sensor_list:
-                # Using product_id as namespace (unique to each subarray)
-                result = yield self.subarray_katportals[product_id].set_sampling_strategies(product_id, sensor, 'event')
+                # Using product_id to retrieve unique namespace
+                result = yield self.subarray_katportals[product_id].set_sampling_strategies(self.namespaces[product_id], 
+                    sensor, 'event')
+            log.info('Subscribed to {} sensors'.format(len(sensor_list)))
         elif(sub == 'unsubscribe'):
-            result = yield self.subarray_katportals[product_id].unsubscribe(namespace = product_id)
+            log.info('Unsubscribing from {} sensors'.format(len(sensor_list)))
+            yield self.subarray_katportals[product_id].unsubscribe(namespace = self.namespaces[product_id])
+            yield self.subarray_katportals[product_id].disconnect()
 
     def component_name(self, short_name, pool_resources, log):
         """Determine the full name of a subarray component. 
