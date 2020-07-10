@@ -17,7 +17,6 @@ def cli(prog = sys.argv[0]):
     main(config = opts.config)
 
 def on_shutdown():
-    # notify_slack("KATPortal module at MeerKAT has halted. Might want to check that!")
     log.info("Shutting Down Katportal Clients")
     sys.exit()
 

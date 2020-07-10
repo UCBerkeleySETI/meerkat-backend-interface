@@ -138,7 +138,7 @@ ___,-| |----''    / |         `._`-.          `----
                     components which belong to the current subarray.
                     Eg "array_1".
                     This name is unique across all current subarrays (no 
-                    two concurrently active subarrays will have the same name). 
+                    two concurrently active subarrays will have the same name).
                     However, it is not a globally unique identifier for all 
                     time. An identical name may be provided for later 
                     activations of other subarrays. 
@@ -199,7 +199,10 @@ ___,-| |----''    / |         `._`-.          `----
             redis-channel: 'alerts' <-- "configure"
             
         Examples:
-            > ?configure array_1_bc856M4k a1,a2,a3,a4 128000 {"cam.http":{"camdata":"http://monctl.devnmk.camlab.kat.ac.za/api/client/2"},"stream_type2":{"stream_name1":"stream_address1","stream_name2":"stream_address2"}} BLUSE_3
+            > ?configure array_1_bc856M4k a1,a2,a3,a4 128000 {
+            "cam.http":{"camdata":"http://monctl.devnmk.camlab.kat.ac.za/api/client/2"},
+            "stream_type2":{"stream_name1":"stream_address1","stream_name2":"stream_address2"}} 
+            BLUSE_3
         """
         try:
             antennas_list = antennas_csv.split(",")
@@ -217,16 +220,25 @@ ___,-| |----''    / |         `._`-.          `----
             cbf_prefix = 'wide'
             log.error('Could not extract CBF prefix; defaulting to \'wide\'')
         statuses = []
-        statuses.append(write_pair_redis(self.redis_server, "{}:timestamp".format(product_id), time.time()))
-        statuses.append(write_list_redis(self.redis_server, "{}:antennas".format(product_id), antennas_list))
-        statuses.append(write_pair_redis(self.redis_server, "{}:n_channels".format(product_id), n_channels))
-        statuses.append(write_pair_redis(self.redis_server, "{}:proxy_name".format(product_id), proxy_name))
-        statuses.append(write_pair_redis(self.redis_server, "{}:streams".format(product_id), json.dumps(json_dict)))
-        statuses.append(write_pair_redis(self.redis_server, "{}:cam:url".format(product_id), cam_url))
-        statuses.append(write_pair_redis(self.redis_server, "current:obs:id", product_id))
-        statuses.append(write_pair_redis(self.redis_server, "{}:cbf_prefix".format(product_id), cbf_prefix))
+        statuses.append(write_pair_redis(self.redis_server, 
+            "{}:timestamp".format(product_id), time.time()))
+        statuses.append(write_list_redis(self.redis_server, 
+            "{}:antennas".format(product_id), antennas_list))
+        statuses.append(write_pair_redis(self.redis_server, 
+            "{}:n_channels".format(product_id), n_channels))
+        statuses.append(write_pair_redis(self.redis_server, 
+            "{}:proxy_name".format(product_id), proxy_name))
+        statuses.append(write_pair_redis(self.redis_server, 
+            "{}:streams".format(product_id), json.dumps(json_dict)))
+        statuses.append(write_pair_redis(self.redis_server, 
+            "{}:cam:url".format(product_id), cam_url))
+        statuses.append(write_pair_redis(self.redis_server, 
+            "current:obs:id", product_id))
+        statuses.append(write_pair_redis(self.redis_server, 
+            "{}:cbf_prefix".format(product_id), cbf_prefix))
         msg = "configure:{}".format(product_id)
-        statuses.append(publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg))
+        statuses.append(publish_to_redis(self.redis_server, 
+            REDIS_CHANNELS.alerts, msg))
         if all(statuses):
             return ("ok",)
         else:

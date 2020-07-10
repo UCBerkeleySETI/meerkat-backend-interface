@@ -142,10 +142,12 @@ def json_str_formatter(str_dict):
     """Formatting for json.loads
 
     Args:
-        str_dict (str): str containing dict of spead streams (received on ?configure).
+        str_dict (str): str containing dict of spead streams (received 
+        on ?configure).
 
     Returns:
-        str_dict (str): str containing dict of spead streams, formatted for use with json.loads
+        str_dict (str): str containing dict of spead streams, formatted 
+        for use with json.loads
     """
     # Is there a better way of doing this?
     str_dict = str_dict.replace('\'', '"')  # Swap quote types for json format
@@ -174,16 +176,20 @@ def create_addr_list_filled(addr0, n_groups, n_addrs, streams_per_instance, offs
     n_addrs = n_addrs - offset
     addr_list = []
     if(n_addrs > streams_per_instance*n_groups):
-        log.warning('Too many streams: {} will not be processed.'.format(n_addrs - streams_per_instance*n_groups))
+        log.warning('Too many streams: {} will not be processed.'.format(
+            n_addrs - streams_per_instance*n_groups))
         for i in range(0, n_groups):
-            addr_list.append(prefix + '.{}+{}'.format(suffix0, streams_per_instance - 1))
+            addr_list.append(prefix + '.{}+{}'.format(
+                suffix0, streams_per_instance - 1))
             suffix0 = suffix0 + streams_per_instance
     else:
         n_instances_req = int(np.ceil(n_addrs/float(streams_per_instance)))
         for i in range(1, n_instances_req):
-            addr_list.append(prefix + '.{}+{}'.format(suffix0, streams_per_instance - 1))
+            addr_list.append(prefix + '.{}+{}'.format(suffix0, 
+                streams_per_instance - 1))
             suffix0 = suffix0 + streams_per_instance
-        addr_list.append(prefix + '.{}+{}'.format(suffix0, n_addrs - 1 - i*streams_per_instance))
+        addr_list.append(prefix + '.{}+{}'.format(suffix0, 
+            n_addrs - 1 - i*streams_per_instance))
     return addr_list
 
 def create_addr_list_distributed(addr0, n_groups, n_addrs):
@@ -205,7 +211,8 @@ def create_addr_list_distributed(addr0, n_groups, n_addrs):
     n_per_group = np.ones(n_groups, dtype=int)*(n_addrs/n_groups)
     n_per_group[:extra_addrs] += 1
     for i in range(0, min(n_addrs, n_groups)):
-        addr_list.append(prefix + '.{}'.format(int(suffix0)) + '+' + str(n_per_group[i]-1))
+        addr_list.append(prefix + '.{}'.format(int(suffix0)) + '+' 
+            + str(n_per_group[i]-1))
         suffix0 = int(suffix0) + n_per_group[i]
     return addr_list
 
@@ -214,9 +221,12 @@ def read_spead_addresses(spead_addrs, n_groups, streams_per_instance, offset):
     Assumes this format.
 
     Args:
-        spead_addrs (str): string containing spead IP addresses in the format above.
-        n_groups (int): number of stream addresses to be sent to each processing instance.
+        spead_addrs (str): string containing spead IP addresses in the format 
+        above.
+        n_groups (int): number of stream addresses to be sent to each 
+        processing instance.
         offset (int): number of streams to skip before apportioning IPs.
+
     Returns:
         addr_list (list): list of spead stream IP address groups.
         port (int): port number.
@@ -226,7 +236,8 @@ def read_spead_addresses(spead_addrs, n_groups, streams_per_instance, offset):
     try:
         addr0, n_addrs = addrs.split('+')
         n_addrs = int(n_addrs) + 1
-        addr_list = create_addr_list_filled(addr0, n_groups, n_addrs, streams_per_instance, offset)
+        addr_list = create_addr_list_filled(addr0, n_groups, n_addrs, 
+            streams_per_instance, offset)
     except ValueError:
         addr_list = [addrs + '+0']
         n_addrs = 1
@@ -246,8 +257,9 @@ def cli():
                                   \'idle\': PKTSTART will not be sent.
                                   \'auto\': PKTSTART will be sent each 
                                       time a target is tracked.
-                                  \'armed\': PKTSTART will only be sent for the next target. 
-                                      Thereafter, the state will transition to idle.'
+                                  \'armed\': PKTSTART will only be sent for 
+                                      the next target. Thereafter, the state 
+                                      will transition to idle.'
                            """,
                       default = 'auto')
     (opts, args) = parser.parse_args()
@@ -263,13 +275,15 @@ def configure(cfg_file):
         cfg_file (str): File path for config file (.yml).
 
     Returns:
-        List of instances and the number of streams to be processed per instance.
+        List of instances and the number of streams to be processed per 
+        instance.
     """
     try:
         with open(cfg_file, 'r') as f:
             try:
                 cfg = yaml.safe_load(f)
-                return(cfg['hashpipe_instances'], cfg['streams_per_instance'][0])
+                return(cfg['hashpipe_instances'], 
+                    cfg['streams_per_instance'][0])
             except yaml.YAMLError as E:
                 log.error(E)
     except IOError:
@@ -326,26 +340,31 @@ def stream_sensor_name(product_id, redis_server, sensor):
         sensor (str): Short sensor name (from the .yml config file).
 
     Returns:
-        stream_sensor (str): Full stream sensor name for querying via KATPortal.
+        stream_sensor (str): Full stream sensor name for querying 
+        via KATPortal.
     """
     s_num = product_id[-1] # subarray number
     cbf_prefix = redis_server.get('{}:cbf_prefix'.format(product_id))
-    stream_sensor = '{}:subarray_{}_streams_{}_{}'.format(product_id, s_num, cbf_prefix, sensor)
+    stream_sensor = '{}:subarray_{}_streams_{}_{}'.format(product_id, 
+        s_num, cbf_prefix, sensor)
     return stream_sensor
 
 def target_name(target_string, length, delimiter = "|"):
-    """Limit target description length and replace punctuation with dashes for compatibility
-    with filterbank/raw file header requirements. All contents up to the stop character
-    are kept.
+    """Limit target description length and replace punctuation with dashes for
+    compatibility with filterbank/raw file header requirements. All contents 
+    up to the stop character are kept.
 
     Args:
-        target_string (str): Target description string from CBF. A typical example:
-        "J0918-1205 | Hyd A | Hydra A | 3C 218 | PKS 0915-11, radec, 9:18:05.28, -12:05:48.9"
+        target_string (str): Target description string from CBF. A typical 
+        example:
+        "J0918-1205 | Hyd A | Hydra A | 3C 218 | PKS 0915-11, radec, 
+        9:18:05.28, -12:05:48.9"
         length (int): Maximum length for target description.
         delimiter (str): Character at which to split the target string. 
 
     Returns:
-        target: Formatted target description suitable for filterbank/raw headers.
+        target: Formatted target description suitable for 
+        filterbank/raw headers.
     """ 
     # Assuming target name or description will always come first
     target = target_string.split(',')[0] # Split at first comma
@@ -363,8 +382,8 @@ def target_name(target_string, length, delimiter = "|"):
 
 def main(port, cfg_file, triggermode):
     # Refactor this in future.
-    # For further information on the Hashpipe-Redis gateway messages, please see
-    # appendix B in https://arxiv.org/pdf/1906.07391.pdf
+    # For further information on the Hashpipe-Redis gateway messages, please 
+    # see appendix B in https://arxiv.org/pdf/1906.07391.pdf
     log = set_logger(log_level = logging.DEBUG)
     log.info("Starting Coordinator")
     # Set number of instances and streams per instance
@@ -419,9 +438,12 @@ def main(port, cfg_file, triggermode):
                     log.info("No stream IP offset; defaulting to 0")
                     offset = 0
                 # Generate list of stream IP addresses
-                all_streams = json.loads(json_str_formatter(red.get("{}:streams".format(product_id))))
+                all_streams = json.loads(json_str_formatter(red.get(
+                    "{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
-                addr_list, port, n_addrs = read_spead_addresses(list(streams.values())[0], len(hashpipe_instances), streams_per_instance, offset)
+                addr_list, port, n_addrs = read_spead_addresses(list(
+                    streams.values())[0], len(hashpipe_instances), 
+                    streams_per_instance, offset)
                 n_red_chans = len(addr_list)
                 # Number of antennas
                 ant_key = '{}:antennas'.format(product_id)
@@ -429,41 +451,54 @@ def main(port, cfg_file, triggermode):
                 pub_gateway_msg(red, global_chan, 'NANTS', n_ants, log, True)
                 # Sync time (UNIX, seconds)
                 sensor_key = cbf_sensor_name(product_id, red, 'sync_time')   
-                sync_time = int(float(red.get(sensor_key))) # Is there a cleaner way to achieve this casting?
-                pub_gateway_msg(red, global_chan, 'SYNCTIME', sync_time, log, True)
+                sync_time = int(float(red.get(sensor_key))) # Is there a cleaner way?
+                pub_gateway_msg(red, global_chan, 'SYNCTIME', 
+                    sync_time, log, True)
                 # Port
                 pub_gateway_msg(red, global_chan, 'BINDPORT', port, log, True)
                 # Total number of streams
-                pub_gateway_msg(red, global_chan, 'FENSTRM', n_addrs, log, True)
+                pub_gateway_msg(red, global_chan, 'FENSTRM', 
+                    n_addrs, log, True)
                 # Total number of frequency channels    
                 n_freq_chans = red.get('{}:n_channels'.format(product_id))
-                pub_gateway_msg(red, global_chan, 'FENCHAN', n_freq_chans, log, True)
+                pub_gateway_msg(red, global_chan, 'FENCHAN', 
+                    n_freq_chans, log, True)
                 # Number of channels per substream
-                sensor_key = cbf_sensor_name(product_id, red, 'antenna_channelised_voltage_n_chans_per_substream')   
+                sensor_key = cbf_sensor_name(product_id, red, 
+                    'antenna_channelised_voltage_n_chans_per_substream')   
                 n_chans_per_substream = red.get(sensor_key)
-                pub_gateway_msg(red, global_chan, 'HNCHAN', n_chans_per_substream, log, True)
+                pub_gateway_msg(red, global_chan, 'HNCHAN', 
+                    n_chans_per_substream, log, True)
                 # Number of spectra per heap
-                sensor_key = cbf_sensor_name(product_id, red, 'tied_array_channelised_voltage_0x_spectra_per_heap')   
+                sensor_key = cbf_sensor_name(product_id, red, 
+                    'tied_array_channelised_voltage_0x_spectra_per_heap')   
                 spectra_per_heap = red.get(sensor_key)
-                pub_gateway_msg(red, global_chan, 'HNTIME', spectra_per_heap, log, True)
+                pub_gateway_msg(red, global_chan, 'HNTIME', spectra_per_heap,
+                    log, True)
                 # Number of ADC samples per heap
-                sensor_key = cbf_sensor_name(product_id, red, 'antenna_channelised_voltage_n_samples_between_spectra')   
+                sensor_key = cbf_sensor_name(product_id, red, 
+                    'antenna_channelised_voltage_n_samples_between_spectra')   
                 adc_per_spectra = red.get(sensor_key)
                 adc_per_heap = int(adc_per_spectra)*int(spectra_per_heap)
-                pub_gateway_msg(red, global_chan, 'HCLOCKS', adc_per_heap, log, True)
+                pub_gateway_msg(red, global_chan, 'HCLOCKS', 
+                    adc_per_heap, log, True)
                 # Centre frequency
-                sensor_key = stream_sensor_name(product_id, red, 'antenna_channelised_voltage_centre_frequency')
+                sensor_key = stream_sensor_name(product_id, red, 
+                    'antenna_channelised_voltage_centre_frequency')
                 centre_freq = red.get(sensor_key)
                 centre_freq = float(centre_freq)/1e6
                 centre_freq = '{0:.17g}'.format(centre_freq)
-                pub_gateway_msg(red, global_chan, 'FECENTER', centre_freq, log, True)
+                pub_gateway_msg(red, global_chan, 'FECENTER', centre_freq, 
+                    log, True)
                 # Coarse channel bandwidth (from F engines)
                 # Note: no sign information!  
-                sensor_key = cbf_sensor_name(product_id, red, 'adc_sample_rate')
+                sensor_key = cbf_sensor_name(product_id, red, 
+                    'adc_sample_rate')
                 adc_sample_rate = red.get(sensor_key)
                 coarse_chan_bw = float(adc_sample_rate)/2.0/int(n_freq_chans)/1e6
                 coarse_chan_bw = '{0:.17g}'.format(coarse_chan_bw)
-                pub_gateway_msg(red, global_chan, 'CHAN_BW', coarse_chan_bw, log, True) 
+                pub_gateway_msg(red, global_chan, 'CHAN_BW', coarse_chan_bw, 
+                    log, True) 
                 # Set PKTSTART to 0 on configure
                 pub_gateway_msg(red, global_chan, 'PKTSTART', 0, log, True) 
                 # Subscription IPs for processing nodes
@@ -471,30 +506,37 @@ def main(port, cfg_file, triggermode):
                     local_chan = HPGDOMAIN + '://' + hashpipe_instances[i] + '/set'
                     # Number of streams for instance i
                     n_streams_per_instance = int(addr_list[i][-1])+1
-                    pub_gateway_msg(red, local_chan, 'NSTRM', n_streams_per_instance, log, True)
+                    pub_gateway_msg(red, local_chan, 'NSTRM', 
+                        n_streams_per_instance, log, True)
                     # Absolute starting channel for instance i
                     s_chan = offset*int(n_chans_per_substream) + i*n_streams_per_instance*int(n_chans_per_substream)
                     pub_gateway_msg(red, local_chan, 'SCHAN', s_chan, log, True)
                     # Destination IP addresses for instance i
-                    pub_gateway_msg(red, local_chan, 'DESTIP', addr_list[i], log, True)
+                    pub_gateway_msg(red, local_chan, 'DESTIP', addr_list[i],
+                        log, True)
             # If the current subarray is deconfigured:
             if(msg_type == 'deconfigure'):
-                pub_gateway_msg(red, global_chan, 'DESTIP', '0.0.0.0', log, False)
+                pub_gateway_msg(red, global_chan, 'DESTIP', '0.0.0.0', 
+                    log, False)
                 log.info('Subarray deconfigured')
             # Handle the full data-suspect bitmask, one bit per polarisation
             # per F-engine.
             if(msg_type == 'data-suspect'):
                 mask = value
                 bitmask = '#{:x}'.format(int(mask, 2))
-                pub_gateway_msg(red, global_chan, 'FESTATUS', bitmask, log, False)
+                pub_gateway_msg(red, global_chan, 'FESTATUS', bitmask, 
+                    log, False)
             # If the current subarray is on source and tracking:
             if(msg_type == 'tracking'):
                 product_id = description
                 if((tracking == 0) & (triggermode != 'idle')):
                     # Set PKTSTART
-                    pkt_idx_start = get_start_idx(red, hashpipe_instances, PKTIDX_MARGIN, log)
-                    pub_gateway_msg(red, global_chan, 'PKTSTART', pkt_idx_start, log, False)
-                    # If armed, reset triggermode to idle after triggering once.
+                    pkt_idx_start = get_start_idx(red, hashpipe_instances, 
+                        PKTIDX_MARGIN, log)
+                    pub_gateway_msg(red, global_chan, 'PKTSTART', 
+                        pkt_idx_start, log, False)
+                    # If armed, reset triggermode to idle after triggering 
+                    # once.
                     if(triggermode == 'armed'):
                         triggermode = 'idle'
                         red.set('coordinator:trigger_mode', 'idle')
@@ -504,20 +546,25 @@ def main(port, cfg_file, triggermode):
                     target = target.split(',')
                     ra_str = target[-2].strip()
                     dec_str = target[-1].strip()
-                    pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, log, False)
-                    pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, log, False)
+                    pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, 
+                        log, False)
+                    pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, 
+                        log, False)
                 tracking = 1 
             # Update pointing coordinates:
             if('pos_request_base' in description):
                 # RA and Dec (in degrees)
                 if('dec' in description):
                     dec_deg = value
-                    pub_gateway_msg(red, global_chan, 'DEC', dec_deg, log, False)
+                    pub_gateway_msg(red, global_chan, 'DEC', dec_deg, 
+                        log, False)
                 elif('ra' in description):    
-                    # pos_request_base_ra value is given in hrs (single float value)
+                    # pos_request_base_ra value is given in hrs (single float 
+                    # value)
                     ra_hrs = value
                     ra_deg = float(ra_hrs)*15.0 # Convert to degrees
-                    pub_gateway_msg(red, global_chan, 'RA', ra_deg, log, False)
+                    pub_gateway_msg(red, global_chan, 'RA', ra_deg, 
+                        log, False)
                 # Azimuth and elevation (in degrees):
                 elif('azim' in description):
                     az = value
@@ -528,18 +575,24 @@ def main(port, cfg_file, triggermode):
             # Update target name:
             if('target' in description):
                 target = target_name(value, 68, "|")
-                pub_gateway_msg(red, global_chan, 'SRC_NAME', target, log, False)  
+                pub_gateway_msg(red, global_chan, 'SRC_NAME', target, 
+                    log, False)  
             # When a source is no longer being tracked:  
             if msg_type == 'not-tracking':
                 if(tracking == 1):
-                    # For the moment during testing, get dwell time from one of the hosts.
-                    # Then set to zero and then back to to the original dwell time.
-                    host_key = '{}://{}/status'.format(HPGDOMAIN, hashpipe_instances[2])
+                    # For the moment during testing, get dwell time from one 
+                    # of the hosts. Then set to zero and then back to to the 
+                    # original dwell time.
+                    host_key = '{}://{}/status'.format(HPGDOMAIN, 
+                        hashpipe_instances[2])
                     dwell_time = get_dwell_time(red, host_key)
-                    pub_gateway_msg(red, global_chan, 'DWELL', '0', log, False)
-                    pub_gateway_msg(red, global_chan, 'PKTSTART', '0', log, False)
+                    pub_gateway_msg(red, global_chan, 'DWELL', '0', 
+                        log, False)
+                    pub_gateway_msg(red, global_chan, 'PKTSTART', '0', 
+                        log, False)
                     time.sleep(1) # Wait for processing nodes.
-                    pub_gateway_msg(red, global_chan, 'DWELL', dwell_time, log, False)
+                    pub_gateway_msg(red, global_chan, 'DWELL', dwell_time, 
+                        log, False)
                 tracking = 0
     except KeyboardInterrupt:
         log.info("Stopping coordinator")
