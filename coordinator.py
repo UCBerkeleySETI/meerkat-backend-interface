@@ -530,7 +530,21 @@ def main(port, cfg_file, triggermode):
             if(msg_type == 'tracking'):
                 product_id = description
                 if((tracking == 0) & (triggermode != 'idle')):
-                    # Set PKTSTART
+                    # Publish RA and Dec (string form):
+                    # Attempt to retrieve them from Redis. 
+                    # (Temporary approach until a better sensor is found)
+                    try:
+                        target = red.get('{}:target'.format(product_id))
+                        target = target.split(',')
+                        ra_str = target[-2].strip()
+                        dec_str = target[-1].strip()
+                        pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, 
+                            log, False)
+                        pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, 
+                            log, False)
+                    except:
+                        log.error("Target not available")
+                    # Set PKTSTART:
                     pkt_idx_start = get_start_idx(red, hashpipe_instances, 
                         PKTIDX_MARGIN, log)
                     pub_gateway_msg(red, global_chan, 'PKTSTART', 
@@ -541,15 +555,7 @@ def main(port, cfg_file, triggermode):
                         triggermode = 'idle'
                         red.set('coordinator:trigger_mode', 'idle')
                         log.info('Triggermode set to \'idle\' from \'armed\'')
-                    # RA and Dec (string form)
-                    target = red.get('{}:target'.format(product_id))
-                    target = target.split(',')
-                    ra_str = target[-2].strip()
-                    dec_str = target[-1].strip()
-                    pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, 
-                        log, False)
-                    pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, 
-                        log, False)
+                # Set state to 'tracking'
                 tracking = 1 
             # Update pointing coordinates:
             if('pos_request_base' in description):
