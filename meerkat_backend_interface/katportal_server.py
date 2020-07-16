@@ -161,15 +161,6 @@ class BLKATPortalClient(object):
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
                         '{}:{}'.format('not-tracking', product_id))
-                    if(sensor_value == 'stop'):
-                        # TODO: remove requirement to build sensor
-                        # list here.    
-                        sensors_for_update = self.build_sub_sensors(product_id)
-                        if(len(sensors_for_update) > 0):
-                            self.subscription('unsubscribe', product_id, 
-                                sensors_for_update)
-                        log.info('Unsubscribed and disconnected from {} sensors'.format(
-                            len(sensors_for_update)))
                                          
     def subarray_data_suspect(self, product_id):
         """Publish a global subarray data-suspect value by checking each
@@ -639,7 +630,10 @@ class BLKATPortalClient(object):
             log.error("Could not retrieve schedule blocks: {} attempts, giving up.".format(retries))
 
     def _capture_start(self, product_id):
-        """Responds to capture-start request
+        """Responds to capture-start request. Subscriptions to required 
+        sensors are made. Note that this must be done here (on capture-start),
+        because some sensors (notably observation-activity) only become available 
+        for subscription on capture-start,
 
         Args:
             product_id (str): the name of the current subarray provided in the
@@ -648,13 +642,18 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
+        # Once-off sensors to query on ?capture_done
+        # Uncomment below to add sensors for query.
+        # sensors_to_query = [] 
+        # self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)
         sensors_for_update = self.build_sub_sensors(product_id)
         log.info(sensors_for_update)
         # Start io_loop to listen to sensors whose values should be registered
         # immediately when they change.
         if(len(sensors_for_update) > 0):
             loop = tornado.ioloop.IOLoop.current()
-            loop.add_callback(lambda: self.subscription('subscribe', product_id, sensors_for_update))
+            loop.add_callback(lambda: self.subscription('subscribe', 
+                product_id, sensors_for_update))
             loop.start()
 
     def _capture_done(self, product_id):
@@ -667,11 +666,13 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        # Once-off sensors to query on ?capture_done
-        # Uncomment below to add sensors for query.
-        # sensors_to_query = [] 
-        # self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)
-        pass 
+        # TODO: remove requirement to build sensor
+        # list here.    
+        sensors_for_update = self.build_sub_sensors(product_id)
+        if(len(sensors_for_update) > 0):
+            self.subscription('unsubscribe', product_id, sensors_for_update)
+            log.info('Unsubscribed and disconnected from {} sensors'.format(
+                len(sensors_for_update)))
 
     def _deconfigure(self, product_id):
         """Responds to deconfigure request
