@@ -26,6 +26,7 @@ setuptools.setup(
         'coordinator',
         'katcp_start',
         'katportal_start',
+        'slack_proxy_start',
         ],
     packages=setuptools.find_packages(),
 
@@ -44,6 +45,7 @@ setuptools.setup(
             'coordinator = coordinator:cli',
             'katcp_start = katcp_start:cli',
             'katportal_start = katportal_start:cli',
+            'slack_proxy_start = slack_proxy_start:cli',
             ]
         },
     )
