@@ -357,13 +357,13 @@ class BLKATPortalClient(object):
             with open(cfg_file, 'r') as f:
                 try:
                     cfg = yaml.safe_load(f)
-                    return(cfg['sensors_per_antenna'], 
-                        cfg['cbf_sensors_on_configure'],           
-                        cfg['stream_sensors'], 
-                        cfg['cbf_sensors'], 
-                        cfg['sensors_on_configure'],
-                        cfg['array_sensors'], 
-                        cfg['stream_sensors_on_configure'])
+                    return(cfg['per_antenna_sub'], 
+                        cfg['cbf_on_configure'],           
+                        cfg['stream_sub'], 
+                        cfg['cbf_sub'], 
+                        cfg['array_on_configure'],
+                        cfg['array_sub'], 
+                        cfg['stream_on_configure'])
                 except yaml.YAMLError as E:
                     log.error(E)
         except IOError:

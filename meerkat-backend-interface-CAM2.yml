@@ -21,22 +21,22 @@ hashpipe_instances:
 - blpn62/0
 - blpn63/0
 
-sensors_per_antenna:         
+per_antenna_sub:         
 - dig_l_band_noise_diode
 - dig_s_band_noise_diode
 - dig_u_band_noise_diode
 
-sensors_on_configure:
+array_on_configure:
 - pool_resources
 
-cbf_sensors:
+cbf_sub:
 - pos_request_base_azim
 - pos_request_base_ra
 - pos_request_base_dec
 - pos_request_base_elev
 - target
 
-cbf_sensors_on_configure:
+cbf_on_configure:
 - antenna_channelised_voltage_n_chans_per_substream
 - tied_array_channelised_voltage_0x_spectra_per_heap
 - sync_time
@@ -44,13 +44,13 @@ cbf_sensors_on_configure:
 - adc_sample_rate
 - input_labelling
 
-stream_sensors:
+stream_sub:
 - antenna_channelised_voltage_input_data_suspect
 
-stream_sensors_on_configure:
+stream_on_configure:
 - antenna_channelised_voltage_centre_freq
 
-array_sensors:
+array_sub:
 - observation_activity
  
  
