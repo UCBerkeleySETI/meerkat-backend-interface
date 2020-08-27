@@ -67,6 +67,7 @@ class BLKATPortalClient(object):
         self.conf_sensors = [] # other sensors to be queried once-off 
         self.subarray_sensors = [] # subarray-level sensors
         self.cont_update_sensors = [] # for all sensors for continuous update
+        self.cbf_on_track = [] # cbf sensors for acquisition on each target
         self.config_file = config_file #check if needed
         self.cbf_name = 'cbf_1' # Default CBF short name
 
@@ -154,6 +155,15 @@ class BLKATPortalClient(object):
                 # Observation state for publication
                 elif('activity' in sensor_name):
                     if(sensor_value == 'track'):
+                        # Required CBF sensor values when a new track begins.
+                        if(len(self.cbf_on_track) > 0):
+                            # Complete the CBF sensor names with the CBF 
+                            # component name.
+                            cbf_on_track_names = ['{}_'.format(self.cbf_name) +
+                                sensor for sensor in self.cbf_on_track]
+                            # Get CBF sensors and write to redis.
+                            self.fetch_once(cbf_on_track_names, product_id,
+                                3, 30, 0.5)
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
                         '{}:{}'.format('tracking', product_id))
@@ -363,7 +373,8 @@ class BLKATPortalClient(object):
                         cfg['cbf_sub'], 
                         cfg['array_on_configure'],
                         cfg['array_sub'], 
-                        cfg['stream_on_configure'])
+                        cfg['stream_on_configure'],
+                        cfg['cbf_on_track'])
                 except yaml.YAMLError as E:
                     log.error(E)
         except IOError:
@@ -494,7 +505,8 @@ class BLKATPortalClient(object):
             cbf_sensors, 
             conf_sensors, 
             subarray_sensors, 
-            stream_conf_sensors) = self.configure_katportal(
+            stream_conf_sensors,
+            cbf_on_track) = self.configure_katportal(
                 os.path.join(os.getcwd(), self.config_file))
             if(ant_sensors is not None):
                 self.ant_sensors = []
@@ -517,6 +529,9 @@ class BLKATPortalClient(object):
             if(cbf_sensors is not None):
                 self.cbf_sensors = []
                 self.cbf_sensors.extend(cbf_sensors)
+            if(cbf_on_track is not None):
+                self.cbf_on_track = []
+                self.cbf_on_track.extend(cbf_on_track)
             log.info('Configuration updated')
         except:
             log.warning('Configuration not updated; old configuration might be present.')
