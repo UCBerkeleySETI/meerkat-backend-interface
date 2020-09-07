@@ -34,6 +34,7 @@ cbf_sub:
 - pos_request_base_ra
 - pos_request_base_dec
 - pos_request_base_elev
+- target
 
 cbf_on_configure:
 - antenna_channelised_voltage_n_chans_per_substream
@@ -44,7 +45,7 @@ cbf_on_configure:
 - input_labelling
 
 cbf_on_track:
-- target
+# - target
 
 stream_sub:
 - antenna_channelised_voltage_input_data_suspect

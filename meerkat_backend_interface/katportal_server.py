@@ -145,7 +145,7 @@ class BLKATPortalClient(object):
                         sensor_name, sensor_value))
                 # Target information for publication
                 elif('target' in sensor_name):
-                    #self.antenna_consensus(product_id, 'target')
+                    write_pair_redis(self.redis_server, sensor_name, sensor_value)
                     publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts,
                         '{}:{}:{}'.format(product_id, 
@@ -155,15 +155,15 @@ class BLKATPortalClient(object):
                 # Observation state for publication
                 elif('activity' in sensor_name):
                     if(sensor_value == 'track'):
-                        # Required CBF sensor values when a new track begins.
-                        if(len(self.cbf_on_track) > 0):
-                            # Complete the CBF sensor names with the CBF 
-                            # component name.
-                            cbf_on_track_names = ['{}_'.format(self.cbf_name) +
-                                sensor for sensor in self.cbf_on_track]
-                            # Get CBF sensors and write to redis.
-                            self.fetch_once(cbf_on_track_names, product_id,
-                                3, 30, 0.5)
+                        # Uncomment below to retrieve once-off CBF sensor values
+                        # if(len(self.cbf_on_track) > 0):
+                        #    # Complete the CBF sensor names with the CBF 
+                        #    # component name.
+                        #    cbf_on_track_names = ['{}_'.format(self.cbf_name) +
+                        #        sensor for sensor in self.cbf_on_track]
+                        #    # Get CBF sensors and write to redis.
+                        #    self.fetch_once(cbf_on_track_names, product_id,
+                        #        3, 30, 0.5)
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
                         '{}:{}'.format('tracking', product_id))

@@ -534,7 +534,9 @@ def main(port, cfg_file, triggermode):
                     # Attempt to retrieve them from Redis. 
                     # (Temporary approach until a better sensor is found)
                     try:
-                        target = red.get('{}:target'.format(product_id))
+                        sub_nr = product_id[-1]
+                        target = red.get('{}:cbf_{}_target'.format(product_id,
+                            sub_nr))
                         target = target.split(',')
                         ra_str = target[-2].strip()
                         dec_str = target[-1].strip()
