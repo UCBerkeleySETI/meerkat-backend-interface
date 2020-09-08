@@ -614,7 +614,9 @@ class BLKATPortalClient(object):
         return antennas, feng_ids
 
     def _capture_init(self, product_id):
-        """Responds to capture-init request by getting schedule blocks
+        """Responds to capture-init request by acquiring schedule block
+        information including the list of pointings and the current 
+        schedule block IDs.
 
         Args:
             product_id (str): the name of the current subarray provided in
@@ -623,6 +625,11 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
+        # Schedule block IDs (sched_observation_schedule_1) 
+        # This is the list of schedule block IDs. The currently running block
+        # will be in position 1.
+        self.fetch_once('sched_observation_schedule_1', product_id, 3, 30, 0.5)
+        # Schedule blocks - pointing list
         retries = 3
         # Increase the timeout by this factor on subsequent retries
         timeout_factor = 0.5 
@@ -672,7 +679,8 @@ class BLKATPortalClient(object):
             loop.start()
 
     def _capture_done(self, product_id):
-        """Responds to capture-done request
+        """Responds to capture-done request. Unsubscribes from sensors
+        and resets the schedule block list to 'Unknown_SB'.
 
         Args:
             product_id (str): the name of the current subarray provided in
@@ -681,6 +689,10 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
+        # Reset schedule block to empty list
+        log.info('capture_done')
+        redis_key = '{}:sched_observation_schedule_1'.format(product_id)
+        write_pair_redis(self.redis_server, sensor, 'Unknown_SB')
         # TODO: remove requirement to build sensor
         # list here.    
         sensors_for_update = self.build_sub_sensors(product_id)
