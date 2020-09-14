@@ -381,34 +381,26 @@ class BLKATPortalClient(object):
             log.error('Config file not found')
 
     @tornado.gen.coroutine
-    def subscription(self, sub, product_id, sensor_list):
-        """Subscribes or unsubscribes to each sensor listed for asynchronous 
-           updates.
+    def subscribe_list(self, product_id, sensor_list):
+        """Subscribes to each sensor listed for asynchronous updates.
         
         Args:
-            sub (str): Subscribe or unsubscribe. 
             sensor_list (list): Full names of sensors to subscribe to.
             product_id (str): The product ID given in the ?configure request.
 
         Returns:
             None
         """
-        if(sub == 'subscribe'):
-            self.namespaces[product_id] = '{}_{}'.format(product_id, 
-                str(uuid.uuid4()))
-            yield self.subarray_katportals[product_id].connect()
-            result = yield self.subarray_katportals[product_id].subscribe(
-                namespace = self.namespaces[product_id]) 
-            for sensor in sensor_list:
-                # Using product_id to retrieve unique namespace
-                result = yield self.subarray_katportals[product_id].set_sampling_strategies(
-                    self.namespaces[product_id], sensor, 'event')
-            log.info('Subscribed to {} sensors'.format(len(sensor_list)))
-        elif(sub == 'unsubscribe'):
-            log.info('Unsubscribing from {} sensors'.format(len(sensor_list)))
-            yield self.subarray_katportals[product_id].unsubscribe(
-                namespace = self.namespaces[product_id])
-            yield self.subarray_katportals[product_id].disconnect()
+        self.namespaces[product_id] = '{}_{}'.format(product_id, 
+            str(uuid.uuid4()))
+        yield self.subarray_katportals[product_id].connect()
+        result = yield self.subarray_katportals[product_id].subscribe(
+            namespace = self.namespaces[product_id]) 
+        for sensor in sensor_list:
+            # Using product_id to retrieve unique namespace
+            result = yield self.subarray_katportals[product_id].set_sampling_strategies(
+                self.namespaces[product_id], sensor, 'event')
+        log.info('Subscribed to {} sensors'.format(len(sensor_list)))
 
     def component_name(self, short_name, pool_resources, log):
         """Determine the full name of a subarray component. 
@@ -469,7 +461,6 @@ class BLKATPortalClient(object):
             retries (int): The number of times to attempt fetching the sensor values.
             sync_timeout (int): The maximum time to wait for sensor values from CAM. 
 
-        Returns:
             None.
         """ 
         for i in range(retries):
@@ -669,13 +660,12 @@ class BLKATPortalClient(object):
         # sensors_to_query = [] 
         # self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)
         sensors_for_update = self.build_sub_sensors(product_id)
-        log.info(sensors_for_update)
         # Start io_loop to listen to sensors whose values should be registered
         # immediately when they change.
         if(len(sensors_for_update) > 0):
             loop = tornado.ioloop.IOLoop.current()
-            loop.add_callback(lambda: self.subscription('subscribe', 
-                product_id, sensors_for_update))
+            loop.add_callback(lambda: self.subscribe_list(product_id, 
+                sensors_for_update))
             loop.start()
 
     def _capture_done(self, product_id):
@@ -695,11 +685,11 @@ class BLKATPortalClient(object):
         write_pair_redis(self.redis_server, sensor, 'Unknown_SB')
         # TODO: remove requirement to build sensor
         # list here.    
-        sensors_for_update = self.build_sub_sensors(product_id)
-        if(len(sensors_for_update) > 0):
-            self.subscription('unsubscribe', product_id, sensors_for_update)
-            log.info('Unsubscribed and disconnected from {} sensors'.format(
-                len(sensors_for_update)))
+#        sensors_for_update = self.build_sub_sensors(product_id)
+#        if(len(sensors_for_update) > 0):
+#            self.subscription('unsubscribe', product_id, sensors_for_update)
+#            log.info('Unsubscribed and disconnected from {} sensors'.format(
+#                len(sensors_for_update)))
 
     def _deconfigure(self, product_id):
         """Responds to deconfigure request
