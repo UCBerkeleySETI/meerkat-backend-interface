@@ -55,6 +55,6 @@ stream_on_configure:
 
 array_sub:
 - observation_activity
- 
+- script_status 
  
 
