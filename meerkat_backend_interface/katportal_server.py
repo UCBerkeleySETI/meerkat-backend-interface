@@ -171,7 +171,11 @@ class BLKATPortalClient(object):
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts, 
                         '{}:{}'.format('not-tracking', product_id))
-                                         
+                # If script not running, attempt to unsubscribe from sensors
+                elif('script_status' in sensor_name):
+                    if(sensor_value != 'busy'):
+                       self.unsubscribe_list(product_id)
+
     def subarray_data_suspect(self, product_id):
         """Publish a global subarray data-suspect value by checking each
         individual antenna. If any antennas are marked faulty by an operator, 
@@ -379,6 +383,23 @@ class BLKATPortalClient(object):
                     log.error(E)
         except IOError:
             log.error('Config file not found')
+
+
+    @tornado.gen.coroutine
+    def unsubscribe_list(self, product_id):
+        """Unsubscribe from all sensor websocket subscriptions for 
+        the subarray designated by product_id.
+
+        Args: 
+            product_id (str): Name of the current subarray.
+
+        Returns:
+            None
+        """
+        yield self.subarray_katportals[product_id].unsubscribe(
+            namespace = self.namespaces[product_id])
+        yield self.subarray_katportals[product_id].disconnect()
+        log.info('Unsubscribed from sensors.')   
 
     @tornado.gen.coroutine
     def subscribe_list(self, product_id, sensor_list):
@@ -683,13 +704,6 @@ class BLKATPortalClient(object):
         log.info('capture_done')
         redis_key = '{}:sched_observation_schedule_1'.format(product_id)
         write_pair_redis(self.redis_server, sensor, 'Unknown_SB')
-        # TODO: remove requirement to build sensor
-        # list here.    
-#        sensors_for_update = self.build_sub_sensors(product_id)
-#        if(len(sensors_for_update) > 0):
-#            self.subscription('unsubscribe', product_id, sensors_for_update)
-#            log.info('Unsubscribed and disconnected from {} sensors'.format(
-#                len(sensors_for_update)))
 
     def _deconfigure(self, product_id):
         """Responds to deconfigure request
