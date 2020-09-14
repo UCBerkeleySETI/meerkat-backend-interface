@@ -68,7 +68,6 @@ class BLKATPortalClient(object):
         self.subarray_sensors = [] # subarray-level sensors
         self.cont_update_sensors = [] # for all sensors for continuous update
         self.cbf_on_track = [] # cbf sensors for acquisition on each target
-        self.config_file = config_file #check if needed
         self.cbf_name = 'cbf_1' # Default CBF short name
 
     def MSG_TO_FUNCTION(self, msg_type):
@@ -145,7 +144,6 @@ class BLKATPortalClient(object):
                         sensor_name, sensor_value))
                 # Target information for publication
                 elif('target' in sensor_name):
-                    write_pair_redis(self.redis_server, sensor_name, sensor_value)
                     publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.sensor_alerts,
                         '{}:{}:{}'.format(product_id, 
