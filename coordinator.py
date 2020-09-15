@@ -530,6 +530,31 @@ def main(port, cfg_file, triggermode):
             if(msg_type == 'tracking'):
                 product_id = description
                 if((tracking == 0) & (triggermode != 'idle')):
+                    # Publish DATADIR according to the current schedule 
+                    # block ID. This entails retrieving the list of 
+                    # schedule blocks, extracting the ID of the current
+                    # one and formatting it as a file path.
+                    # Schedule block IDs follow the format:
+                    # YYYYMMDD-XXXX where XXXX is the schedule block number 
+                    # (in order of assignment). To create the correct
+                    # DATADIR, we format it (per schedule block) as follows:
+                    # DATADIR=YYYYMMDD/XXXX
+                    # If the schedule block ID is not known, we set it to:
+                    # DATADIR=Unknown_SB
+                    current_sb_id = 'Unknown_SB' # Default
+                    try: 
+                        sb_key = '{}:sched_observation_schedule_1'.format(product_id)
+                        sb_ids = red.get(sb_key)
+                        # First ID in list is the current SB (as per CAM GUI)
+                        current_sb_id = sb_ids.split(',')[0] 
+                        # Format for file path
+                        current_sb_id = current_sb_id.replace('-', '/')
+                    except:
+                        log.error("Schedule block IDs not available")
+                        log.warning("Setting DATADIR=Unknown_SB")
+                    # Publish DATADIR to gateway
+                    pub_gateway_msg(red, global_chan, 'DATADIR', current_sb_id, 
+                        log, False)
                     # Publish RA and Dec (string form):
                     # Attempt to retrieve them from Redis. 
                     # (Temporary approach until a better sensor is found)
