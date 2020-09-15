@@ -174,6 +174,314 @@ class BLKATPortalClient(object):
                     if(sensor_value != 'busy'):
                        self.unsubscribe_list(product_id)
 
+    def _configure(self, product_id):
+        """Executes when configure request is processed
+
+        Args:
+            product_id (str): the product id given in the ?configure request
+
+        Returns:
+            None
+        """
+        # Update configuration:
+        try:
+            (ant_sensors, 
+            cbf_conf_sensors, 
+            stream_sensors, 
+            cbf_sensors, 
+            conf_sensors, 
+            subarray_sensors, 
+            stream_conf_sensors,
+            cbf_on_track) = self.configure_katportal(
+                os.path.join(os.getcwd(), self.config_file))
+            if(ant_sensors is not None):
+                self.ant_sensors = []
+                self.ant_sensors.extend(ant_sensors)
+            if(cbf_conf_sensors is not None):
+                self.cbf_conf_sensors = []
+                self.cbf_conf_sensors.extend(cbf_conf_sensors)
+            if(stream_conf_sensors is not None):
+                self.stream_conf_sensors = []
+                self.stream_conf_sensors.extend(stream_conf_sensors)
+            if(stream_sensors is not None):
+                self.stream_sensors = []
+                self.stream_sensors.extend(stream_sensors)
+            if(conf_sensors is not None):
+                self.conf_sensors = []
+                self.conf_sensors.extend(conf_sensors)
+            if(subarray_sensors is not None):
+                self.subarray_sensors = []
+                self.subarray_sensors.extend(subarray_sensors)
+            if(cbf_sensors is not None):
+                self.cbf_sensors = []
+                self.cbf_sensors.extend(cbf_sensors)
+            if(cbf_on_track is not None):
+                self.cbf_on_track = []
+                self.cbf_on_track.extend(cbf_on_track)
+            log.info('Configuration updated')
+        except:
+            log.warning('Configuration not updated; old configuration might be present.')
+        cam_url = self.redis_server.get("{}:{}".format(product_id, 'cam:url'))
+        client = KATPortalClient(cam_url, on_update_callback=partial(
+            self.on_update_callback_fn, product_id), logger=log)
+        #client = KATPortalClient(cam_url, 
+        #    on_update_callback=lambda x: self.on_update_callback_fn(product_id), 
+        #    logger=log)
+        self.subarray_katportals[product_id] = client
+        log.info("Created katportalclient object for : {}".format(product_id))
+        subarray_nr = product_id[-1]
+        ant_key = '{}:antennas'.format(product_id) 
+        ant_list = self.redis_server.lrange(ant_key, 0, 
+            self.redis_server.llen(ant_key))
+        # Enter antenna list into the history hash
+        ant_history = json.dumps(ant_list)
+        self.save_history(self.redis_server, product_id, 'antennas', 
+            ant_history)
+        # Get sensors on configure
+        if(len(self.conf_sensors) > 0):
+            conf_sensor_names = ['subarray_{}_'.format(subarray_nr) 
+                + sensor for sensor in self.conf_sensors]
+            self.fetch_once(conf_sensor_names, product_id, 3, 30, 0.5)
+        # Get CBF component name (in case it has changed to 
+        # CBF_DEV_[product_id] instead of CBF_[product_id])
+        key = '{}:subarray_{}_{}'.format(product_id, subarray_nr, 
+            'pool_resources')
+        pool_resources = self.redis_server.get(key).split(',')
+        self.cbf_name = self.component_name('cbf', pool_resources, log)
+        key = '{}:{}'.format(product_id, 'cbf_name')
+        write_pair_redis(self.redis_server, key, self.cbf_name)
+        # Get CBF sensor values required on configure.
+        cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
+        if(len(self.cbf_conf_sensors) > 0):
+            # Complete the CBF sensor names with the CBF component name.
+            cbf_sensor_prefix = '{}_{}_'.format(self.cbf_name, cbf_prefix)
+            cbf_conf_sensor_names = [cbf_sensor_prefix + 
+                sensor for sensor in self.cbf_conf_sensors]
+            # Get CBF sensors and write to redis.
+            self.fetch_once(cbf_conf_sensor_names, product_id, 3, 30, 0.5)
+            # Calculate antenna-to-Fengine mapping
+            antennas, feng_ids = self.antenna_mapping(product_id, 
+                cbf_sensor_prefix)
+            write_pair_redis(self.redis_server, 
+                '{}:antenna_names'.format(product_id), antennas)
+            write_pair_redis(self.redis_server, 
+                '{}:feng_ids'.format(product_id), feng_ids)
+        # Get stream sensors on configure:
+        if(len(self.stream_conf_sensors) > 0):
+            stream_conf_sensors = ['subarray_{}_streams_{}_{}'.format(
+                subarray_nr, cbf_prefix, sensor) for sensor in 
+                self.stream_conf_sensors]
+            self.fetch_once(stream_conf_sensors, product_id, 3, 30, 0.5)  
+        # Indicate to anyone listening that the configure process is complete.
+        publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 
+            'conf_complete:{}'.format(product_id))
+
+    def _conf_complete(self, product_id):
+        """Called when sensor values for acquisition on configure have been 
+        acquired.
+        
+        Args: 
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
+
+        Returns:
+            None
+        """
+        log.info("Sensor values on configure acquired for {}.".format(product_id))
+
+    def _capture_init(self, product_id):
+        """Responds to capture-init request by acquiring schedule block
+        information including the list of pointings and the current 
+        schedule block IDs.
+
+        Args:
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
+
+        Returns:
+            None
+        """
+        # Schedule block IDs (sched_observation_schedule_1) 
+        # This is the list of schedule block IDs. The currently running block
+        # will be in position 1.
+        self.fetch_once('sched_observation_schedule_1', product_id, 3, 30, 0.5)
+        # Schedule blocks - pointing list
+        retries = 3
+        # Increase the timeout by this factor on subsequent retries
+        timeout_factor = 0.5 
+        for i in range(0, retries):
+            try:
+                schedule_blocks = self.io_loop.run_sync(
+                    lambda: self._get_future_targets(product_id),
+                    timeout = 30 + timeout_factor*i*30)
+                key = "{}:schedule_blocks".format(product_id)
+                write_pair_redis(self.redis_server, key, 
+                    json.dumps(schedule_blocks))
+                publish_to_redis(self.redis_server, 
+                    REDIS_CHANNELS.sensor_alerts, key)
+                # If success, break.
+                break
+            except:
+                log.warning("Could not retrieve schedule blocks: attempt {} of {}".format(i + 1, retries))
+        # If retried <retries> times, then log an error.
+        if(i == (retries - 1)):
+            log.error("Could not retrieve schedule blocks: {} attempts, giving up.".format(retries))
+
+    def _capture_start(self, product_id):
+        """Responds to capture-start request. Subscriptions to required 
+        sensors are made. Note that this must be done here (on capture-start),
+        because some sensors (notably observation-activity) only become available 
+        for subscription on capture-start,
+
+        Args:
+            product_id (str): the name of the current subarray provided in the
+            ?configure request.
+
+        Returns:
+            None
+        """
+        # Once-off sensors to query on ?capture_done
+        # Uncomment below to add sensors for query.
+        # sensors_to_query = [] 
+        # self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)
+        sensors_for_update = self.build_sub_sensors(product_id)
+        # Start io_loop to listen to sensors whose values should be registered
+        # immediately when they change.
+        if(len(sensors_for_update) > 0):
+            loop = tornado.ioloop.IOLoop.current()
+            loop.add_callback(lambda: self.subscribe_list(product_id, 
+                sensors_for_update))
+            loop.start()
+
+    def _capture_stop(self, product_id):
+        """Responds to capture-stop request.
+
+        Args:
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
+
+        Returns:
+            None
+        """
+        # Once-off sensors to query on ?capture-stop
+        # Uncomment these lines to add sensors for query
+        #sensors_to_query = []  
+        #self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)
+        pass
+
+    def _capture_done(self, product_id):
+        """Responds to capture-done request. Resets the schedule block list to
+        'Unknown_SB'.
+
+        Args:
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
+
+        Returns:
+            None
+        """
+        # Reset schedule block to empty list
+        key = '{}:sched_observation_schedule_1'.format(product_id)
+        write_pair_redis(self.redis_server, key, 'Unknown_SB')
+
+    def _deconfigure(self, product_id):
+        """Responds to deconfigure request
+
+        Args:
+            product_id (str): the name of the current subarray provided in 
+            the ?configure request.
+
+        Returns:
+            None
+        """
+        # Once-off sensors to query on ?deconfigure
+        # Uncomment the following lines to add sensors for query
+        #sensors_to_query = [] 
+        #self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)  
+        if product_id not in self.subarray_katportals:
+            log.warning("Failed to deconfigure a non-existent product_id: {}".format(product_id))
+        else:
+            self.subarray_katportals.pop(product_id)
+            log.info("Deleted KATPortalClient instance for product_id: {}".format(product_id))
+ 
+    def _other(self, product_id):
+        """This is called when an unrecognized request is sent.
+
+        Args:
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
+
+        Returns:
+            None
+        """
+        log.warning("Unrecognized alert : {}".format(message['data']))
+
+    def configure_katportal(self, cfg_file):
+        """Configure the katportal_server from the .yml config file.
+      
+        Args:
+            cfg_file (str): File path to .yml config file.
+      
+        Returns:
+            None
+        """
+        try:
+            with open(cfg_file, 'r') as f:
+                try:
+                    cfg = yaml.safe_load(f)
+                    return(cfg['per_antenna_sub'], 
+                        cfg['cbf_on_configure'],           
+                        cfg['stream_sub'], 
+                        cfg['cbf_sub'], 
+                        cfg['array_on_configure'],
+                        cfg['array_sub'], 
+                        cfg['stream_on_configure'],
+                        cfg['cbf_on_track'])
+                except yaml.YAMLError as E:
+                    log.error(E)
+        except IOError:
+            log.error('Config file not found')
+
+    @tornado.gen.coroutine
+    def unsubscribe_list(self, product_id):
+        """Unsubscribe from all sensor websocket subscriptions for 
+        the subarray designated by product_id.
+
+        Args: 
+            product_id (str): Name of the current subarray.
+
+        Returns:
+            None
+        """
+        yield self.subarray_katportals[product_id].unsubscribe(
+            namespace = self.namespaces[product_id])
+        yield self.subarray_katportals[product_id].disconnect()
+        # Stop io_loop
+        self.io_loop.stop()
+        log.info('Unsubscribed from sensors.')   
+
+    @tornado.gen.coroutine
+    def subscribe_list(self, product_id, sensor_list):
+        """Subscribes to each sensor listed for asynchronous updates.
+        
+        Args:
+            sensor_list (list): Full names of sensors to subscribe to.
+            product_id (str): The product ID given in the ?configure request.
+
+        Returns:
+            None
+        """
+        self.namespaces[product_id] = '{}_{}'.format(product_id, 
+            str(uuid.uuid4()))
+        yield self.subarray_katportals[product_id].connect()
+        result = yield self.subarray_katportals[product_id].subscribe(
+            namespace = self.namespaces[product_id]) 
+        for sensor in sensor_list:
+            # Using product_id to retrieve unique namespace
+            result = yield self.subarray_katportals[product_id].set_sampling_strategies(
+                self.namespaces[product_id], sensor, 'event')
+        log.info('Subscribed to {} sensors'.format(len(sensor_list)))
+
     def subarray_data_suspect(self, product_id):
         """Publish a global subarray data-suspect value by checking each
         individual antenna. If any antennas are marked faulty by an operator, 
@@ -356,72 +664,35 @@ class BLKATPortalClient(object):
             cbf_sensor_list.append(sensor_name)
         return cbf_sensor_list
 
-    def configure_katportal(self, cfg_file):
-        """Configure the katportal_server from the .yml config file.
-      
+    def build_sub_sensors(self, product_id):
+        """Builds the list of sensors for subscription.
+
         Args:
-            cfg_file (str): File path to .yml config file.
-      
-        Returns:
-            None
-        """
-        try:
-            with open(cfg_file, 'r') as f:
-                try:
-                    cfg = yaml.safe_load(f)
-                    return(cfg['per_antenna_sub'], 
-                        cfg['cbf_on_configure'],           
-                        cfg['stream_sub'], 
-                        cfg['cbf_sub'], 
-                        cfg['array_on_configure'],
-                        cfg['array_sub'], 
-                        cfg['stream_on_configure'],
-                        cfg['cbf_on_track'])
-                except yaml.YAMLError as E:
-                    log.error(E)
-        except IOError:
-            log.error('Config file not found')
-
-
-    @tornado.gen.coroutine
-    def unsubscribe_list(self, product_id):
-        """Unsubscribe from all sensor websocket subscriptions for 
-        the subarray designated by product_id.
-
-        Args: 
-            product_id (str): Name of the current subarray.
+            product_id (str): the name of the current subarray provided in
+            the ?configure request.
 
         Returns:
-            None
+            sensors_for_update (list): list of full sensor names for 
+            subscription.
         """
-        yield self.subarray_katportals[product_id].unsubscribe(
-            namespace = self.namespaces[product_id])
-        yield self.subarray_katportals[product_id].disconnect()
-        # Stop io_loop
-        self.io_loop.stop()
-        log.info('Unsubscribed from sensors.')   
-
-    @tornado.gen.coroutine
-    def subscribe_list(self, product_id, sensor_list):
-        """Subscribes to each sensor listed for asynchronous updates.
-        
-        Args:
-            sensor_list (list): Full names of sensors to subscribe to.
-            product_id (str): The product ID given in the ?configure request.
-
-        Returns:
-            None
-        """
-        self.namespaces[product_id] = '{}_{}'.format(product_id, 
-            str(uuid.uuid4()))
-        yield self.subarray_katportals[product_id].connect()
-        result = yield self.subarray_katportals[product_id].subscribe(
-            namespace = self.namespaces[product_id]) 
-        for sensor in sensor_list:
-            # Using product_id to retrieve unique namespace
-            result = yield self.subarray_katportals[product_id].set_sampling_strategies(
-                self.namespaces[product_id], sensor, 'event')
-        log.info('Subscribed to {} sensors'.format(len(sensor_list)))
+        # Get cont update sensors
+        sensors_for_update = []
+        # Antenna sensors:
+        sensors_for_update.extend(self.gen_ant_sensor_list(product_id, 
+            self.ant_sensors))
+        # Stream sensors:
+        cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
+        stream_sensors = self.gen_stream_sensor_list(product_id, 
+            self.stream_sensors, cbf_prefix)
+        sensors_for_update.extend(stream_sensors)
+        # Subarray sensors:
+        for sensor in self.subarray_sensors:
+            sensor = 'subarray_{}_{}'.format(product_id[-1], sensor)
+            sensors_for_update.append(sensor)
+        # CBF sensors:
+        cbf_sensors = self.gen_cbf_sensor_list(self.cbf_sensors, self.cbf_name)
+        sensors_for_update.extend(cbf_sensors)
+        return sensors_for_update
 
     def component_name(self, short_name, pool_resources, log):
         """Determine the full name of a subarray component. 
@@ -500,108 +771,6 @@ class BLKATPortalClient(object):
                 retries)) 
             log.error("{} could not be retrieved.".format(sensor_names))
 
-    def _configure(self, product_id):
-        """Executes when configure request is processed
-
-        Args:
-            product_id (str): the product id given in the ?configure request
-
-        Returns:
-            None
-        """
-        # Update configuration:
-        try:
-            (ant_sensors, 
-            cbf_conf_sensors, 
-            stream_sensors, 
-            cbf_sensors, 
-            conf_sensors, 
-            subarray_sensors, 
-            stream_conf_sensors,
-            cbf_on_track) = self.configure_katportal(
-                os.path.join(os.getcwd(), self.config_file))
-            if(ant_sensors is not None):
-                self.ant_sensors = []
-                self.ant_sensors.extend(ant_sensors)
-            if(cbf_conf_sensors is not None):
-                self.cbf_conf_sensors = []
-                self.cbf_conf_sensors.extend(cbf_conf_sensors)
-            if(stream_conf_sensors is not None):
-                self.stream_conf_sensors = []
-                self.stream_conf_sensors.extend(stream_conf_sensors)
-            if(stream_sensors is not None):
-                self.stream_sensors = []
-                self.stream_sensors.extend(stream_sensors)
-            if(conf_sensors is not None):
-                self.conf_sensors = []
-                self.conf_sensors.extend(conf_sensors)
-            if(subarray_sensors is not None):
-                self.subarray_sensors = []
-                self.subarray_sensors.extend(subarray_sensors)
-            if(cbf_sensors is not None):
-                self.cbf_sensors = []
-                self.cbf_sensors.extend(cbf_sensors)
-            if(cbf_on_track is not None):
-                self.cbf_on_track = []
-                self.cbf_on_track.extend(cbf_on_track)
-            log.info('Configuration updated')
-        except:
-            log.warning('Configuration not updated; old configuration might be present.')
-        cam_url = self.redis_server.get("{}:{}".format(product_id, 'cam:url'))
-        client = KATPortalClient(cam_url, on_update_callback=partial(
-            self.on_update_callback_fn, product_id), logger=log)
-        #client = KATPortalClient(cam_url, 
-        #    on_update_callback=lambda x: self.on_update_callback_fn(product_id), 
-        #    logger=log)
-        self.subarray_katportals[product_id] = client
-        log.info("Created katportalclient object for : {}".format(product_id))
-        subarray_nr = product_id[-1]
-        ant_key = '{}:antennas'.format(product_id) 
-        ant_list = self.redis_server.lrange(ant_key, 0, 
-            self.redis_server.llen(ant_key))
-        # Enter antenna list into the history hash
-        ant_history = json.dumps(ant_list)
-        self.save_history(self.redis_server, product_id, 'antennas', 
-            ant_history)
-        # Get sensors on configure
-        if(len(self.conf_sensors) > 0):
-            conf_sensor_names = ['subarray_{}_'.format(subarray_nr) 
-                + sensor for sensor in self.conf_sensors]
-            self.fetch_once(conf_sensor_names, product_id, 3, 30, 0.5)
-        # Get CBF component name (in case it has changed to 
-        # CBF_DEV_[product_id] instead of CBF_[product_id])
-        key = '{}:subarray_{}_{}'.format(product_id, subarray_nr, 
-            'pool_resources')
-        pool_resources = self.redis_server.get(key).split(',')
-        self.cbf_name = self.component_name('cbf', pool_resources, log)
-        key = '{}:{}'.format(product_id, 'cbf_name')
-        write_pair_redis(self.redis_server, key, self.cbf_name)
-        # Get CBF sensor values required on configure.
-        cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
-        if(len(self.cbf_conf_sensors) > 0):
-            # Complete the CBF sensor names with the CBF component name.
-            cbf_sensor_prefix = '{}_{}_'.format(self.cbf_name, cbf_prefix)
-            cbf_conf_sensor_names = [cbf_sensor_prefix + 
-                sensor for sensor in self.cbf_conf_sensors]
-            # Get CBF sensors and write to redis.
-            self.fetch_once(cbf_conf_sensor_names, product_id, 3, 30, 0.5)
-            # Calculate antenna-to-Fengine mapping
-            antennas, feng_ids = self.antenna_mapping(product_id, 
-                cbf_sensor_prefix)
-            write_pair_redis(self.redis_server, 
-                '{}:antenna_names'.format(product_id), antennas)
-            write_pair_redis(self.redis_server, 
-                '{}:feng_ids'.format(product_id), feng_ids)
-        # Get stream sensors on configure:
-        if(len(self.stream_conf_sensors) > 0):
-            stream_conf_sensors = ['subarray_{}_streams_{}_{}'.format(
-                subarray_nr, cbf_prefix, sensor) for sensor in 
-                self.stream_conf_sensors]
-            self.fetch_once(stream_conf_sensors, product_id, 3, 30, 0.5)  
-        # Indicate to anyone listening that the configure process is complete.
-        publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 
-            'conf_complete:{}'.format(product_id))
-
     def antenna_mapping(self, product_id, cbf_sensor_prefix):
         """Get the mapping from antenna to F-engine ID as given in 
         packet headers.
@@ -624,176 +793,6 @@ class BLKATPortalClient(object):
         feng_ids = str([int(np.floor(int(item[1])/2.0)) for item in 
             labelling])
         return antennas, feng_ids
-
-    def _capture_init(self, product_id):
-        """Responds to capture-init request by acquiring schedule block
-        information including the list of pointings and the current 
-        schedule block IDs.
-
-        Args:
-            product_id (str): the name of the current subarray provided in
-            the ?configure request.
-
-        Returns:
-            None
-        """
-        # Schedule block IDs (sched_observation_schedule_1) 
-        # This is the list of schedule block IDs. The currently running block
-        # will be in position 1.
-        self.fetch_once('sched_observation_schedule_1', product_id, 3, 30, 0.5)
-        # Schedule blocks - pointing list
-        retries = 3
-        # Increase the timeout by this factor on subsequent retries
-        timeout_factor = 0.5 
-        for i in range(0, retries):
-            try:
-                schedule_blocks = self.io_loop.run_sync(
-                    lambda: self._get_future_targets(product_id),
-                    timeout = 30 + timeout_factor*i*30)
-                key = "{}:schedule_blocks".format(product_id)
-                write_pair_redis(self.redis_server, key, 
-                    json.dumps(schedule_blocks))
-                publish_to_redis(self.redis_server, 
-                    REDIS_CHANNELS.sensor_alerts, key)
-                # If success, break.
-                break
-            except:
-                log.warning("Could not retrieve schedule blocks: attempt {} of {}".format(i + 1, retries))
-        # If retried <retries> times, then log an error.
-        if(i == (retries - 1)):
-            log.error("Could not retrieve schedule blocks: {} attempts, giving up.".format(retries))
-
-    def _capture_start(self, product_id):
-        """Responds to capture-start request. Subscriptions to required 
-        sensors are made. Note that this must be done here (on capture-start),
-        because some sensors (notably observation-activity) only become available 
-        for subscription on capture-start,
-
-        Args:
-            product_id (str): the name of the current subarray provided in the
-            ?configure request.
-
-        Returns:
-            None
-        """
-        # Once-off sensors to query on ?capture_done
-        # Uncomment below to add sensors for query.
-        # sensors_to_query = [] 
-        # self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)
-        sensors_for_update = self.build_sub_sensors(product_id)
-        # Start io_loop to listen to sensors whose values should be registered
-        # immediately when they change.
-        if(len(sensors_for_update) > 0):
-            loop = tornado.ioloop.IOLoop.current()
-            loop.add_callback(lambda: self.subscribe_list(product_id, 
-                sensors_for_update))
-            loop.start()
-
-    def _capture_done(self, product_id):
-        """Responds to capture-done request. Resets the schedule block list to
-        'Unknown_SB'.
-
-        Args:
-            product_id (str): the name of the current subarray provided in
-            the ?configure request.
-
-        Returns:
-            None
-        """
-        # Reset schedule block to empty list
-        key = '{}:sched_observation_schedule_1'.format(product_id)
-        write_pair_redis(self.redis_server, key, 'Unknown_SB')
-
-    def _deconfigure(self, product_id):
-        """Responds to deconfigure request
-
-        Args:
-            product_id (str): the name of the current subarray provided in 
-            the ?configure request.
-
-        Returns:
-            None
-        """
-        # Once-off sensors to query on ?deconfigure
-        # Uncomment the following lines to add sensors for query
-        #sensors_to_query = [] 
-        #self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)  
-        if product_id not in self.subarray_katportals:
-            log.warning("Failed to deconfigure a non-existent product_id: {}".format(product_id))
-        else:
-            self.subarray_katportals.pop(product_id)
-            log.info("Deleted KATPortalClient instance for product_id: {}".format(product_id))
-
-    def build_sub_sensors(self, product_id):
-        """Builds the list of sensors for subscription.
-
-        Args:
-            product_id (str): the name of the current subarray provided in
-            the ?configure request.
-
-        Returns:
-            sensors_for_update (list): list of full sensor names for 
-            subscription.
-        """
-        # Get cont update sensors
-        sensors_for_update = []
-        # Antenna sensors:
-        sensors_for_update.extend(self.gen_ant_sensor_list(product_id, 
-            self.ant_sensors))
-        # Stream sensors:
-        cbf_prefix = self.redis_server.get('{}:cbf_prefix'.format(product_id))
-        stream_sensors = self.gen_stream_sensor_list(product_id, 
-            self.stream_sensors, cbf_prefix)
-        sensors_for_update.extend(stream_sensors)
-        # Subarray sensors:
-        for sensor in self.subarray_sensors:
-            sensor = 'subarray_{}_{}'.format(product_id[-1], sensor)
-            sensors_for_update.append(sensor)
-        # CBF sensors:
-        cbf_sensors = self.gen_cbf_sensor_list(self.cbf_sensors, self.cbf_name)
-        sensors_for_update.extend(cbf_sensors)
-        return sensors_for_update
-
-    def _capture_stop(self, product_id):
-        """Responds to capture-stop request.
-
-        Args:
-            product_id (str): the name of the current subarray provided in
-            the ?configure request.
-
-        Returns:
-            None
-        """
-        # Once-off sensors to query on ?capture-stop
-        # Uncomment these lines to add sensors for query
-        #sensors_to_query = []  
-        #self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)
-        pass
- 
-    def _other(self, product_id):
-        """This is called when an unrecognized request is sent.
-
-        Args:
-            product_id (str): the name of the current subarray provided in
-            the ?configure request.
-
-        Returns:
-            None
-        """
-        log.warning("Unrecognized alert : {}".format(message['data']))
-
-    def _conf_complete(self, product_id):
-        """Called when sensor values for acquisition on configure have been 
-        acquired.
-        
-        Args: 
-            product_id (str): the name of the current subarray provided in
-            the ?configure request.
-
-        Returns:
-            None
-        """
-        log.info("Sensor values on configure acquired for {}.".format(product_id))
 
     @tornado.gen.coroutine
     def _get_future_targets(self, product_id):
