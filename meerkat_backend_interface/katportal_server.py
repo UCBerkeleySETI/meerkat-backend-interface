@@ -397,6 +397,8 @@ class BLKATPortalClient(object):
         yield self.subarray_katportals[product_id].unsubscribe(
             namespace = self.namespaces[product_id])
         yield self.subarray_katportals[product_id].disconnect()
+        # Stop io_loop
+        self.io_loop.stop()
         log.info('Unsubscribed from sensors.')   
 
     @tornado.gen.coroutine
@@ -688,8 +690,8 @@ class BLKATPortalClient(object):
             loop.start()
 
     def _capture_done(self, product_id):
-        """Responds to capture-done request. Unsubscribes from sensors
-        and resets the schedule block list to 'Unknown_SB'.
+        """Responds to capture-done request. Resets the schedule block list to
+        'Unknown_SB'.
 
         Args:
             product_id (str): the name of the current subarray provided in
@@ -699,9 +701,8 @@ class BLKATPortalClient(object):
             None
         """
         # Reset schedule block to empty list
-        log.info('capture_done')
-        redis_key = '{}:sched_observation_schedule_1'.format(product_id)
-        write_pair_redis(self.redis_server, sensor, 'Unknown_SB')
+        key = '{}:sched_observation_schedule_1'.format(product_id)
+        write_pair_redis(self.redis_server, key, 'Unknown_SB')
 
     def _deconfigure(self, product_id):
         """Responds to deconfigure request
