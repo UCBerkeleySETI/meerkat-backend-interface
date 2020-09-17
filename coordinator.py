@@ -551,9 +551,10 @@ def main(port, cfg_file, triggermode):
                         current_sb_id = current_sb_id.replace('-', '/')
                     except:
                         log.error("Schedule block IDs not available")
-                        log.warning("Setting DATADIR=Unknown_SB")
+                        log.warning("Setting DATADIR=/buf0/Unknown_SB")
                     # Publish DATADIR to gateway
-                    pub_gateway_msg(red, global_chan, 'DATADIR', current_sb_id, 
+                    datadir = '/buf0/{}'.format(current_sb_id)
+                    pub_gateway_msg(red, global_chan, 'DATADIR', datadir, 
                         log, False)
                     # Publish RA and Dec (string form):
                     # Attempt to retrieve them from Redis. 
