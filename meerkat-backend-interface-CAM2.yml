@@ -23,8 +23,8 @@ hashpipe_instances:
 
 per_antenna_sub:         
 - dig_l_band_noise_diode
-- dig_s_band_noise_diode
-- dig_u_band_noise_diode
+#- dig_s_band_noise_diode
+#- dig_u_band_noise_diode
 
 array_on_configure:
 - pool_resources
@@ -34,7 +34,7 @@ cbf_sub:
 - pos_request_base_ra
 - pos_request_base_dec
 - pos_request_base_elev
-- target
+#- target
 
 cbf_on_configure:
 - antenna_channelised_voltage_n_chans_per_substream

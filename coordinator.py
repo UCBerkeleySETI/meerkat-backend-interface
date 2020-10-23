@@ -556,22 +556,6 @@ def main(port, cfg_file, triggermode):
                     datadir = '/buf0/{}'.format(current_sb_id)
                     pub_gateway_msg(red, global_chan, 'DATADIR', datadir, 
                         log, False)
-                    # Publish RA and Dec (string form):
-                    # Attempt to retrieve them from Redis. 
-                    # (Temporary approach until a better sensor is found)
-                    try:
-                        sub_nr = product_id[-1]
-                        target = red.get('{}:cbf_{}_target'.format(product_id,
-                            sub_nr))
-                        target = target.split(',')
-                        ra_str = target[-2].strip()
-                        dec_str = target[-1].strip()
-                        pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, 
-                            log, False)
-                        pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, 
-                            log, False)
-                    except:
-                        log.error("Target not available")
                     # Set PKTSTART:
                     pkt_idx_start = get_start_idx(red, hashpipe_instances, 
                         PKTIDX_MARGIN, log)
@@ -583,6 +567,30 @@ def main(port, cfg_file, triggermode):
                         triggermode = 'idle'
                         red.set('coordinator:trigger_mode', 'idle')
                         log.info('Triggermode set to \'idle\' from \'armed\'')
+                    # Publish RA and Dec (string form) as well as target name:
+                    # Attempt to retrieve them from Redis. 
+                    # (Temporary approach until a better sensor is found)
+                    try:
+                        # Get first antenna in list:
+                        ant_key = '{}:antennas'.format(product_id) 
+                        ant_list = red.lrange(ant_key, 0, 
+                            red.llen(ant_key))
+                        # Get target string:
+                        target_str = red.get("{}:{}_target".format(product_id, ant_list[0]))
+                        target_str = target_str.split(',') # CSV string is returned
+                        ra_str = target_str[1]
+                        dec_str = target_str[2]
+                        # Publish both to gateway
+                        pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, 
+                            log, False)
+                        pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, 
+                            log, False)
+                        # Get target name and publish:
+                        src_name = target_str[0]
+                        pub_gateway_msg(red, global_chan, 'SRC_NAME', src_name, 
+                            log, False)
+                    except:
+                        log.error("Target not available")
                 # Set state to 'tracking'
                 tracking = 1 
             # Update pointing coordinates:
@@ -606,11 +614,6 @@ def main(port, cfg_file, triggermode):
                 elif('elev' in description):
                     el = value
                     pub_gateway_msg(red, global_chan, 'EL', el, log, False)
-            # Update target name:
-            if('target' in description):
-                target = target_name(value, 68, "|")
-                pub_gateway_msg(red, global_chan, 'SRC_NAME', target, 
-                    log, False)  
             # When a source is no longer being tracked:  
             if msg_type == 'not-tracking':
                 if(tracking == 1):

@@ -345,6 +345,17 @@ class BLKATPortalClient(object):
         # sensors_to_query = [] 
         # self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)
         sensors_for_update = self.build_sub_sensors(product_id)
+        # Test the speed of retrieval for target information from an 
+        # individual antenna:
+        # Retrieve list of antennas:
+        ant_key = '{}:antennas'.format(product_id) 
+        antennas = self.redis_server.lrange(ant_key, 0, 
+            self.redis_server.llen(ant_key))
+        # Build antenna sensor name
+        # Pick first antenna in list for now 
+        # (implement antenna consensus again if this approach proves faster)
+        ant_target = "{}_target".format(antennas[0])        
+        sensors_for_update.append(ant_target)
         # Start io_loop to listen to sensors whose values should be registered
         # immediately when they change.
         if(len(sensors_for_update) > 0):
