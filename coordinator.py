@@ -18,6 +18,8 @@ SENSOR_CHANNEL = redis_tools.REDIS_CHANNELS.sensor_alerts
 TRIGGER_CHANNEL = redis_tools.REDIS_CHANNELS.triggermode
 # Type of stream
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'  
+# F-engine mode (so far 'wide' and 'narrow' are known to be available)
+FENG_TYPE = 'wide.antenna-channelised-voltage'
 # Hashpipe-Redis gateway domain 
 HPGDOMAIN   = 'bluse'
 # Safety margin for setting index of first packet to record.
@@ -441,8 +443,9 @@ def main(port, cfg_file, triggermode):
                 all_streams = json.loads(json_str_formatter(red.get(
                     "{}:streams".format(product_id))))
                 streams = all_streams[STREAM_TYPE]
-                addr_list, port, n_addrs = read_spead_addresses(list(
-                    streams.values())[0], len(hashpipe_instances), 
+                stream_addresses = streams[FENG_TYPE]
+                addr_list, port, n_addrs = read_spead_addresses(stream_addresses, 
+                    len(hashpipe_instances), 
                     streams_per_instance, offset)
                 n_red_chans = len(addr_list)
                 # Number of antennas
