@@ -211,11 +211,21 @@ ___,-| |----''    / |         `._`-.          `----
         except Exception as e:
             log.error(e)
             return ("fail", e)
-        # Extracting CBF prefix from configure message as recommended by CAM
+        # Ascertain the CBF sensor prefix (and F-engine output type).
+        # Default to 'wide'; if 'wide' is not available, try 'narrow1'.
+        # If neither are available, take the first available F-engine 
+        # output type. 
         try:
             stream_type = 'cbf.antenna_channelised_voltage'
-            cbf_prefix = next(iter(json_dict[stream_type])).split('.')[0]
-            log.info('CBF prefix extracted: {}'.format(cbf_prefix))            
+            if('wide.antenna-channelised-voltage' in json_dict[stream_type]):
+                cbf_prefix = 'wide'
+                log.info('CBF prefix extracted: wide')            
+            elif('narrow1.antenna-channelised-voltage' in json_dict[stream_type]):
+                cbf_prefix = 'narrow1'
+                log.info('CBF prefix extracted: narrow1')            
+            else:
+                cbf_prefix = next(iter(json_dict[stream_type])).split('.')[0]
+                log.info('CBF prefix extracted: {}'.format(cb_prefix))            
         except Exception as e:
             cbf_prefix = 'wide'
             log.error('Could not extract CBF prefix; defaulting to \'wide\'')
