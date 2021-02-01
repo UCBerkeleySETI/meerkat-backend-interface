@@ -382,6 +382,27 @@ def target_name(target_string, length, delimiter = "|"):
     target = target[0:length]
     return(target)
 
+def get_target(product_id, target_key, retries, retry_duration, redis_server, log):
+    """
+    Try to fetch the most recent target name by comparing its timestamp
+    to that of the most recent capture-start message.
+    """
+    for i in range(retries):
+        last_target = float(redis_server.get("{}:last-target".format(product_id)))
+        last_start = float(redis_server.get("{}:last-capture-start".format(product_id)))
+        if((last_target - last_start) < 0): # Check if new target available
+            log.warning("No new target name, retrying.")
+            time.sleep(retry_duration)
+            continue
+        else:
+            break
+    if(i == (retries - 1)):
+        log.error("No new target name after {} retries; defaulting to UNKNOWN".format(retries))
+        target = 'UNKNOWN'
+    else:
+        target = redis_server.get(target_key)
+    return target 
+
 def main(port, cfg_file, triggermode):
     # Refactor this in future.
     # For further information on the Hashpipe-Redis gateway messages, please 
@@ -559,6 +580,23 @@ def main(port, cfg_file, triggermode):
                     datadir = '/buf0/{}'.format(current_sb_id)
                     pub_gateway_msg(red, global_chan, 'DATADIR', datadir, 
                         log, False)
+                    # Get new target:
+                    ant_key = '{}:antennas'.format(product_id) 
+                    ant_list = red.lrange(ant_key, 0, red.llen(ant_key))
+                    target_key = "{}:{}_target".format(product_id, ant_list[0])
+                    target_str = get_target(product_id, target_key, 3, 1, red, log)
+                    target_str = target_str.split(',') # CSV string is returned
+                    ra_str = target_str[1]
+                    dec_str = target_str[2]
+                    # Publish new RA_STR and DEC_STR values to gateway
+                    pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, 
+                        log, False)
+                    pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, 
+                        log, False)
+                    # Get target name and publish:
+                    src_name = target_str[0]
+                    pub_gateway_msg(red, global_chan, 'SRC_NAME', src_name, 
+                        log, False)
                     # Set PKTSTART:
                     pkt_idx_start = get_start_idx(red, hashpipe_instances, 
                         PKTIDX_MARGIN, log)
@@ -570,30 +608,6 @@ def main(port, cfg_file, triggermode):
                         triggermode = 'idle'
                         red.set('coordinator:trigger_mode', 'idle')
                         log.info('Triggermode set to \'idle\' from \'armed\'')
-                    # Publish RA and Dec (string form) as well as target name:
-                    # Attempt to retrieve them from Redis. 
-                    # (Temporary approach until a better sensor is found)
-                    try:
-                        # Get first antenna in list:
-                        ant_key = '{}:antennas'.format(product_id) 
-                        ant_list = red.lrange(ant_key, 0, 
-                            red.llen(ant_key))
-                        # Get target string:
-                        target_str = red.get("{}:{}_target".format(product_id, ant_list[0]))
-                        target_str = target_str.split(',') # CSV string is returned
-                        ra_str = target_str[1]
-                        dec_str = target_str[2]
-                        # Publish both to gateway
-                        pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, 
-                            log, False)
-                        pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, 
-                            log, False)
-                        # Get target name and publish:
-                        src_name = target_str[0]
-                        pub_gateway_msg(red, global_chan, 'SRC_NAME', src_name, 
-                            log, False)
-                    except:
-                        log.error("Target not available")
                 # Set state to 'tracking'
                 tracking = 1 
             # Update pointing coordinates:

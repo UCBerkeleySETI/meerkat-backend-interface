@@ -14,6 +14,7 @@ import json
 import numpy as np
 from datetime import datetime
 import uuid
+import time
 
 from .redis_tools import (
     REDIS_CHANNELS,
@@ -148,6 +149,8 @@ class BLKATPortalClient(object):
                         REDIS_CHANNELS.sensor_alerts,
                         '{}:{}:{}'.format(product_id, 
                         sensor_name, sensor_value))
+                    write_pair_redis(self.redis_server, '{}:last-target'.format(product_id), 
+                        str(time.time()))
                     self.save_history(self.redis_server, product_id, 'target',
                         sensor_value)
                 # Observation state for publication
@@ -340,6 +343,9 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
+        # Save capture-start time:
+        write_pair_redis(self.redis_server, '{}:last-capture-start'.format(product_id), 
+            str(time.time())) 
         # Once-off sensors to query on ?capture_done
         # Uncomment below to add sensors for query.
         # sensors_to_query = [] 
