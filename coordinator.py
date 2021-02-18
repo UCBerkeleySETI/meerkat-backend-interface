@@ -27,7 +27,7 @@ PKTIDX_MARGIN = 1024
 # Slack channel to publish to: 
 SLACK_CHANNEL = 'meerkat-obs-log'
 # Redis channel to send messages to the Slack proxy
-SLACK_PROXY = 'slack-messages'
+PROXY_CHANNEL = 'slack-messages'
 
 def get_pkt_idx(red_server, host_key):
     """Get PKTIDX for a host (if active).
