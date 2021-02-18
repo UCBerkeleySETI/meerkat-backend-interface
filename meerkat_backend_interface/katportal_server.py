@@ -275,6 +275,8 @@ class BLKATPortalClient(object):
                 subarray_nr, cbf_prefix, sensor) for sensor in 
                 self.stream_conf_sensors]
             self.fetch_once(stream_conf_sensors, product_id, 3, 30, 0.5)  
+        # Initialise last-target to 0
+        write_pair_redis(self.redis_server, '{}:last-target'.format(product_id), 0) 
         # Indicate to anyone listening that the configure process is complete.
         publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 
             'conf_complete:{}'.format(product_id))
