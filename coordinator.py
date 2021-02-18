@@ -24,6 +24,10 @@ FENG_TYPE = 'wide.antenna-channelised-voltage'
 HPGDOMAIN   = 'bluse'
 # Safety margin for setting index of first packet to record.
 PKTIDX_MARGIN = 1024 
+# Slack channel to publish to: 
+SLACK_CHANNEL = 'meerkat-obs-log'
+# Redis channel to send messages to the Slack proxy
+SLACK_PROXY = 'slack-messages'
 
 def get_pkt_idx(red_server, host_key):
     """Get PKTIDX for a host (if active).
@@ -602,6 +606,9 @@ def main(port, cfg_file, triggermode):
                         PKTIDX_MARGIN, log)
                     pub_gateway_msg(red, global_chan, 'PKTSTART', 
                         pkt_idx_start, log, False)
+                    # Alert via slack:
+                    slack_message = "{}::meerkat:: New recording started!".format(SLACK_CHANNEL)
+                    red.publish(PROXY_CHANNEL, slack_message)
                     # If armed, reset triggermode to idle after triggering 
                     # once.
                     if(triggermode == 'armed'):
