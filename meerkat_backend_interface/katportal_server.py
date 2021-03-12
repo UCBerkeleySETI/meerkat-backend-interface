@@ -22,6 +22,11 @@ from .redis_tools import (
     write_list_redis,
     publish_to_redis
     )
+
+#Slack channel to publish to: 
+SLACK_CHANNEL = 'meerkat-obs-log'
+# Redis channel to send messages to the Slack proxy
+PROXY_CHANNEL = 'slack-messages'
     
 from .logger import log 
 
@@ -295,6 +300,9 @@ class BLKATPortalClient(object):
             None
         """
         log.info("Sensor values on configure acquired for {}.".format(product_id))
+        # Alert via slack:
+        slack_message = "{}::meerkat:: Successful subarray configuration".format(SLACK_CHANNEL)
+        publish_to_redis(self.redis_server, PROXY_CHANNEL, slack_message)
 
     def _capture_init(self, product_id):
         """Responds to capture-init request by acquiring schedule block
