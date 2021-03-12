@@ -377,7 +377,10 @@ def target_name(target_string, length, delimiter = "|"):
     # Assuming target name or description will always come first
     # Remove any outer single quotes for compatibility:
     target = target_string.strip('\'')
-    target = target.split('radec,') # Split at 'radec'
+    if('radec target' in target):
+        target = target.split('radec target,') # Split at 'radec tar'
+    else:
+        target = target.split('radec,') # Split at 'radec tar'
     # Target:
     if(target[0].strip() == ''): # if no target field
         # strip twice for python compatibility
@@ -600,8 +603,9 @@ def main(port, cfg_file, triggermode):
                     # Get new target:
                     ant_key = '{}:antennas'.format(product_id) 
                     ant_list = red.lrange(ant_key, 0, red.llen(ant_key))
+                    log.info(ant_list)
                     target_key = "{}:{}_target".format(product_id, ant_list[0])
-                    target_str = get_target(product_id, target_key, 3, 1, red, log)
+                    target_str = get_target(product_id, target_key, 5, 15, red, log)
                     target_str, ra_str, dec_str = target_name(target_str, 16, delimiter = "|")
                     # Publish new RA_STR and DEC_STR values to gateway
                     pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, 
