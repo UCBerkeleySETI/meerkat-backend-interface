@@ -589,7 +589,10 @@ def main(port, cfg_file, triggermode):
                     ant_list = red.lrange(ant_key, 0, red.llen(ant_key))
                     target_key = "{}:{}_target".format(product_id, ant_list[0])
                     target_str = get_target(product_id, target_key, 3, 1, red, log)
-                    target_str = target_str.split(',') # CSV string is returned
+                    log.info(target_str)
+                    target_str = target_name(target_str, 16, delimiter = "|")
+                    log.info(target_str)
+                    #target_str = target_str.split(',') # CSV string is returned
                     ra_str = target_str[1]
                     dec_str = target_str[2]
                     # Publish new RA_STR and DEC_STR values to gateway
@@ -615,6 +618,15 @@ def main(port, cfg_file, triggermode):
                         triggermode = 'idle'
                         red.set('coordinator:trigger_mode', 'idle')
                         log.info('Triggermode set to \'idle\' from \'armed\'')
+                    elif('nshot' in triggermode):
+                        nshot = triggermode.split(':')
+                        n = int(nshot[1]) - 1
+                        triggermode = '{}:{}'.format(nshot[0], n)
+                        log.info('Triggermode: n shots remaining: {}'.format(n))
+                        if(n <= 0):
+                            triggermode = 'idle'
+                            red.set('coordinator:trigger_mode', 'idle')
+                            log.info('Triggermode set to \'idle\' from \'nshot\'')
                 # Set state to 'tracking'
                 tracking = 1 
             # Update pointing coordinates:
