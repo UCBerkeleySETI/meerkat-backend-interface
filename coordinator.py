@@ -378,7 +378,7 @@ def target_name(target_string, length, delimiter = "|"):
     # Remove any outer single quotes for compatibility:
     target = target_string.strip('\'')
     if('radec target' in target):
-        target = target.split('radec target,') # Split at 'radec tar'
+        target = target.split('radec target,') # Split at 'radec target'
     else:
         target = target.split('radec,') # Split at 'radec tar'
     # Target:
@@ -388,6 +388,7 @@ def target_name(target_string, length, delimiter = "|"):
     else:
         target_name = target[0].split(delimiter)[0] # Split at specified delimiter
         target_name = target_name.strip() # Remove leading and trailing whitespace
+        target_name = target_name.strip(",") # Remove trailing comma
         # Punctuation below taken from string.punctuation()
         # Note that + and - have been removed (relevant to coordinate names)
         punctuation = "!\"#$%&\'()*,./:;<=>?@[\\]^_`{|}~" 
