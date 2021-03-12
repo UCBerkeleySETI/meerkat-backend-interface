@@ -267,7 +267,7 @@ def cli():
                                       the next target. Thereafter, the state 
                                       will transition to idle.'
                            """,
-                      default = 'auto')
+                      default = 'idle')
     (opts, args) = parser.parse_args()
     # if not opts.port:
     #     print "MissingArgument: Port number"
