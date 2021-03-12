@@ -371,20 +371,33 @@ def target_name(target_string, length, delimiter = "|"):
     Returns:
         target: Formatted target description suitable for 
         filterbank/raw headers.
+        ra_str: RA_STR as accessed from target string.
+        dec_str: DEC_STR as accessed from target string.
     """ 
     # Assuming target name or description will always come first
-    target = target_string.split(',')[0] # Split at first comma
-    target = target.split(delimiter)[0] # Split at specified delimiter
-    target = target.strip() # Remove leading and trailing whitespace
-    # Punctuation below taken from string.punctuation()
-    # Note that + and - have been removed (relevant to coordinate names)
-    punctuation = "!\"#$%&\'()*,./:;<=>?@[\\]^_`{|}~" 
-    # Replace all punctuation with underscores
-    table = str.maketrans(punctuation, '_'*30)
-    target = target.translate(table)
-    # Limit target string to max allowable in headers (68 chars)
-    target = target[0:length]
-    return(target)
+    # Remove any outer single quotes for compatibility:
+    target = target_string.strip('\'')
+    target = target.split('radec,') # Split at 'radec'
+    # Target:
+    if(target[0].strip() == ''): # if no target field
+        # strip twice for python compatibility
+        target_name = 'NOT_PROVIDED'
+    else:
+        target_name = target[0].split(delimiter)[0] # Split at specified delimiter
+        target_name = target_name.strip() # Remove leading and trailing whitespace
+        # Punctuation below taken from string.punctuation()
+        # Note that + and - have been removed (relevant to coordinate names)
+        punctuation = "!\"#$%&\'()*,./:;<=>?@[\\]^_`{|}~" 
+        # Replace all punctuation with underscores
+        table = str.maketrans(punctuation, '_'*30)
+        target_name = target_name.translate(table)
+        # Limit target string to max allowable in headers (68 chars)
+        target_name = target_name[0:length]
+    # RA_STR and DEC_STR
+    radec = target[1].split(',')
+    ra_str = radec[0].strip()
+    dec_str = radec[1].strip()
+    return(target_name, ra_str, dec_str)
 
 def get_target(product_id, target_key, retries, retry_duration, redis_server, log):
     """
@@ -589,19 +602,14 @@ def main(port, cfg_file, triggermode):
                     ant_list = red.lrange(ant_key, 0, red.llen(ant_key))
                     target_key = "{}:{}_target".format(product_id, ant_list[0])
                     target_str = get_target(product_id, target_key, 3, 1, red, log)
-                    log.info(target_str)
-                    target_str = target_name(target_str, 16, delimiter = "|")
-                    log.info(target_str)
-                    #target_str = target_str.split(',') # CSV string is returned
-                    ra_str = target_str[1]
-                    dec_str = target_str[2]
+                    target_str, ra_str, dec_str = target_name(target_str, 16, delimiter = "|")
                     # Publish new RA_STR and DEC_STR values to gateway
                     pub_gateway_msg(red, global_chan, 'RA_STR', ra_str, 
                         log, False)
                     pub_gateway_msg(red, global_chan, 'DEC_STR', dec_str, 
                         log, False)
                     # Get target name and publish:
-                    src_name = target_str[0]
+                    src_name = target_str
                     pub_gateway_msg(red, global_chan, 'SRC_NAME', src_name, 
                         log, False)
                     # Set PKTSTART:

@@ -149,6 +149,8 @@ class BLKATPortalClient(object):
                         REDIS_CHANNELS.sensor_alerts,
                         '{}:{}:{}'.format(product_id, 
                         sensor_name, sensor_value))
+                    write_pair_redis(self.redis_server, '{}:target'.format(product_id), 
+                        sensor_value)
                     write_pair_redis(self.redis_server, '{}:last-target'.format(product_id), 
                         str(time.time()))
                     self.save_history(self.redis_server, product_id, 'target',
