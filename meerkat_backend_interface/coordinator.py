@@ -62,10 +62,10 @@ class Coordinator(object):
         # Process incoming Redis messages:
         try:
             for msg in ps.listen():
-                msg_type, description, value = self.parse_redis_msg(message)
+                msg_type, description, value = self.parse_redis_msg(msg)
                 # If trigger mode is changed on the fly:
                 if((msg_type == 'coordinator') & (description == 'trigger_mode')):
-                    triggermode = value
+                    self.triggermode = value
                     self.red.set('coordinator:trigger_mode', value)
                     log.info('Trigger mode set to \'{}\''.format(value))
                 # If all the sensor values required on configure have been
@@ -117,13 +117,13 @@ class Coordinator(object):
         log.info('New subarray built: {}'.format(product_id))
         # Get IP address offset (if there is one) for ingesting only a specific
         # portion of the full band.
-        offset = self.ip_offset()
+        offset = self.ip_offset(product_id)
         # Initialise trigger mode (idle, armed or auto)
-        self.red.set('coordinator:trigger_mode:{}'.format(description), triggermode)
-        log.info('Trigger mode for {} on startup: {}'.format(description, triggermode))
+        self.red.set('coordinator:trigger_mode:{}'.format(description), self.triggermode)
+        log.info('Trigger mode for {} on startup: {}'.format(description, self.triggermode))
         # Generate list of stream IP addresses and publish appropriate messages to 
         # processing nodes:
-        addr_list, port, n_addrs, n_red_chans = self.ip_addresses(product_id)
+        addr_list, port, n_addrs, n_red_chans = self.ip_addresses(product_id, offset)
         # Allocate hosts:
         free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
                 self.red.llen('coordinator:free_hosts'))
@@ -149,46 +149,46 @@ class Coordinator(object):
             # NOTE: can we address multiple processing nodes more easily?
             for i in range(len(chan_list)):
                 # Port (BINDPORT)
-                self.pub_gateway_msg(red, chan_list[i], 'BINDPORT', port, log, True)        
+                self.pub_gateway_msg(self.red, chan_list[i], 'BINDPORT', port, log, True)        
                 # Total number of streams (FENSTRM)
-                self.pub_gateway_msg(red, chan_list[i], 'FENSTRM', n_addrs, log, True)
+                self.pub_gateway_msg(self.red, chan_list[i], 'FENSTRM', n_addrs, log, True)
                 # Sync time (UNIX, seconds)
-                t_sync = self.sync_time()
-                self.pub_gateway_msg(red, chan_list[i], 'SYNCTIME', t_sync, log, True)
+                t_sync = self.sync_time(product_id)
+                self.pub_gateway_msg(self.red, chan_list[i], 'SYNCTIME', t_sync, log, True)
                 # Centre frequency (FECENTER)
-                fecenter = self.centre_freq() 
-                self.pub_gateway_msg(red, chan_list[i], 'FECENTER', fecenter, log, True)
-                # Number of ADC samples per heap (HCLOCKS)
-                adc_per_heap = self.samples_per_heap()
-                self.pub_gateway_msg(red, chan_list[i], 'HCLOCKS', adc_per_heap, log, True)
+                fecenter = self.centre_freq(product_id) 
+                self.pub_gateway_msg(self.red, chan_list[i], 'FECENTER', fecenter, log, True)
+                # Total number of frequency channels (FENCHAN)    
+                n_freq_chans = self.red.get('{}:n_channels'.format(product_id))
+                self.pub_gateway_msg(self.red, chan_list[i], 'FENCHAN', n_freq_chans, log, True)
                 # Coarse channel bandwidth (from F engines)
                 # Note: no sign information! 
                 # (CHAN_BW)
-                chan_bw = self.coarse_chan_bw()
-                self.pub_gateway_msg(red, chan_list[i], 'CHAN_BW', coarse_chan_bw, log, True) 
-                # Total number of frequency channels (FENCHAN)    
-                n_freq_chans = red.get('{}:n_channels'.format(product_id))
-                self.pub_gateway_msg(red, chan_list[i], 'FENCHAN', n_freq_chans, log, True)
+                chan_bw = self.coarse_chan_bw(product_id, n_freq_chans)
+                self.pub_gateway_msg(self.red, chan_list[i], 'CHAN_BW', chan_bw, log, True) 
                 # Number of channels per substream (HNCHAN)
-                hnchan = self.chan_per_substream()
-                self.pub_gateway_msg(red, chan_list[i], 'HNCHAN', hnchan, log, True)
+                hnchan = self.chan_per_substream(product_id)
+                self.pub_gateway_msg(self.red, chan_list[i], 'HNCHAN', hnchan, log, True)
                 # Number of spectra per heap (HNTIME)
                 hntime = self.spectra_per_heap(product_id)
-                self.pub_gateway_msg(red, chan_list[i], 'HNTIME', spectra_per_heap, log, True)
+                self.pub_gateway_msg(self.red, chan_list[i], 'HNTIME', hntime, log, True)
+                # Number of ADC samples per heap (HCLOCKS)
+                adc_per_heap = self.samples_per_heap(product_id, hntime)
+                self.pub_gateway_msg(self.red, chan_list[i], 'HCLOCKS', adc_per_heap, log, True)
                 # Number of antennas (NANTS)
                 n_ants = self.antennas(product_id)
-                self.pub_gateway_msg(red, chan_list[i], 'NANTS', n_ants, log, True)
+                self.pub_gateway_msg(self.red, chan_list[i], 'NANTS', n_ants, log, True)
                 # Set PKTSTART to 0 on configure
-                self.pub_gateway_msg(red, chan_list[i], 'PKTSTART', 0, log, True)
+                self.pub_gateway_msg(self.red, chan_list[i], 'PKTSTART', 0, log, True)
                 # Number of streams for instance i (NSTRM)
                 n_streams_per_instance = int(addr_list[i][-1])+1
-                self.pub_gateway_msg(red, chan_list[i], 'NSTRM', n_streams_per_instance, 
+                self.pub_gateway_msg(self.red, chan_list[i], 'NSTRM', n_streams_per_instance, 
                     log, True)
                 # Absolute starting channel for instance i (SCHAN)
-                s_chan = offset*int(n_chans_per_substream) + i*n_streams_per_instance*int(n_chans_per_substream)
-                self.pub_gateway_msg(red, chan_list[i], 'SCHAN', s_chan, log, True)
+                s_chan = offset*int(hnchan) + i*n_streams_per_instance*int(hnchan)
+                self.pub_gateway_msg(self.red, chan_list[i], 'SCHAN', s_chan, log, True)
                 # Destination IP addresses for instance i (DESTIP)
-                self.pub_gateway_msg(red, chan_list[i], 'DESTIP', addr_list[i], log, True)
+                self.pub_gateway_msg(self.red, chan_list[i], 'DESTIP', addr_list[i], log, True)
 
     def tracking_start(self, product_id):
         """Tracking
@@ -229,7 +229,7 @@ class Coordinator(object):
         # NOTE: need to fix triggermode retrieval? Perhaps done?
         triggermode = self.red.get('coordinator:trigger_mode:{}'.format(product_id))
         if(triggermode == 'armed'):
-            red.set('coordinator:trigger_mode:{}'.format(product_id), 'idle')
+            self.red.set('coordinator:trigger_mode:{}'.format(product_id), 'idle')
             log.info('Triggermode set to \'idle\' from \'armed\' from {}'.format(product_id))
         elif('nshot' in triggermode):
             nshot = triggermode.split(':')
@@ -680,20 +680,20 @@ class Coordinator(object):
     def chan_per_substream(self, product_id):
         """Number of channels per substream - equivalent to HNCHAN.
         """
-        sensor_key = cbf_sensor_name(product_id, red, 
+        sensor_key = self.cbf_sensor_name(product_id, 
                 'antenna_channelised_voltage_n_chans_per_substream')   
-        n_chans_per_substream = red.get(sensor_key)
+        n_chans_per_substream = self.red.get(sensor_key)
         return n_chans_per_substream
 
     def spectra_per_heap(self, product_id):
         """Number of spectra per heap (HNTIME).
         """
-        sensor_key = cbf_sensor_name(product_id,  
+        sensor_key = self.cbf_sensor_name(product_id,  
             'tied_array_channelised_voltage_0x_spectra_per_heap')   
         spectra_per_heap = self.red.get(sensor_key)
         return spectra_per_heap
 
-    def coarse_chan_bw(self):
+    def coarse_chan_bw(self, product_id, n_freq_chans):
         """Coarse channel bandwidth (from F engines)
         Note: no sign information!  
         Equivalent to CHAN_BW.
@@ -705,7 +705,7 @@ class Coordinator(object):
         coarse_chan_bw = '{0:.17g}'.format(coarse_chan_bw)
         return coarse_chan_bw
 
-    def centre_freq(self):
+    def centre_freq(self, product_id):
         """Centre frequency (FECENTER)
         """
         sensor_key = self.stream_sensor_name(product_id,
@@ -715,23 +715,23 @@ class Coordinator(object):
         centre_freq = '{0:.17g}'.format(centre_freq)
         return centre_freq
 
-    def sync_time(self):
+    def sync_time(self, product_id):
         """Sync time (UNIX, seconds)
         """
         sensor_key = self.cbf_sensor_name(product_id, 'sync_time')   
         sync_time = int(float(self.red.get(sensor_key))) # Is there a cleaner way?
         return sync_time
 
-    def samples_per_heap(self):
+    def samples_per_heap(self, product_id, spectra_per_heap):
         """Equivalent to HCLOCKS.
         """
-        sensor_key = cbf_sensor_name(product_id, red,
+        sensor_key = self.cbf_sensor_name(product_id,
             'antenna_channelised_voltage_n_samples_between_spectra')
-        adc_per_spectra = red.get(sensor_key)
+        adc_per_spectra = self.red.get(sensor_key)
         adc_per_heap = int(adc_per_spectra)*int(spectra_per_heap)
         return adc_per_heap
 
-    def ip_offset(self):
+    def ip_offset(self, product_id):
         """Get IP offset (for ingesting fractions of the band)
         """
         try:
@@ -743,16 +743,16 @@ class Coordinator(object):
             offset = 0
         return offset
 
-    def ip_addresses(self, product_id):
+    def ip_addresses(self, product_id, offset):
         """Acquire and apportion multicast IP groups.
         """
         all_streams = json.loads(self.json_str_formatter(self.red.get(
             "{}:streams".format(product_id))))
-        streams = all_streams[self.stream_type]
-        stream_addresses = streams[self.feng_type]
+        streams = all_streams[STREAM_TYPE]
+        stream_addresses = streams[FENG_TYPE]
         addr_list, port, n_addrs = self.read_spead_addresses(stream_addresses, 
-            len(hashpipe_instances), 
-            streams_per_instance, offset)
+            len(self.hashpipe_instances), 
+            self.streams_per_instance, offset)
         n_red_chans = len(addr_list)
         return addr_list, port, n_addrs, n_red_chans
 
