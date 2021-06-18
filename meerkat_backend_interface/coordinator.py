@@ -203,17 +203,17 @@ class Coordinator(object):
         datadir = self.datadir(product_id)
         for i in range(len(chan_list)):
             # Publish DATADIR to gateway
-            self.pub_gateway_msg(red, chan_list[i], 'DATADIR', datadir, 
+            self.pub_gateway_msg(self.red, chan_list[i], 'DATADIR', datadir, 
                 log, False)
             # Target information:
             target_str, ra_str, dec_str = self.target(product_id)
             # SRC_NAME:
-            self.pub_gateway_msg(red, chan_list[i], 'SRC_NAME', src_name, 
+            self.pub_gateway_msg(self.red, chan_list[i], 'SRC_NAME', target_str, 
                 log, False)
             # RA_STR and DEC_STR 
-            self.pub_gateway_msg(red, chan_list[i], 'RA_STR', ra_str, 
+            self.pub_gateway_msg(self.red, chan_list[i], 'RA_STR', ra_str, 
                 log, False)
-            self.pub_gateway_msg(red, chan_list[i], 'DEC_STR', dec_str, 
+            self.pub_gateway_msg(self.red, chan_list[i], 'DEC_STR', dec_str, 
                 log, False)
         # Set PKTSTART separately after all the above messages have 
         # all been delivered:
@@ -249,7 +249,7 @@ class Coordinator(object):
     def tracking_stop(self, product_id):
         """If the subarray stops tracking, take appropriate action.
         """
-        tracking_state = self.redis.get('coordinator:tracking:{}'.format(product_id))
+        tracking_state = self.red.get('coordinator:tracking:{}'.format(product_id))
         # If tracking state transitions from 'track' to any of the other states, 
         # follow the procedure below. Otherwise, do nothing.  
         if(tracking_state == '1'):
@@ -286,7 +286,7 @@ class Coordinator(object):
         chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
         # Send deconfigure message to these specific hosts:
         for i in range(len(chan_list)):
-            self.pub_gateway_msg(red, chan_list[i], 'DESTIP', '0.0.0.0', log, False)
+            self.pub_gateway_msg(self.red, chan_list[i], 'DESTIP', '0.0.0.0', log, False)
         log.info('Subarray {} deconfigured'.format(description))
         # Release hosts:
         # NOTE: in future, get rid of write_list_redis function and append or pop. 
@@ -295,7 +295,7 @@ class Coordinator(object):
         free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
                 self.red.llen('coordinator:free_hosts'))
         # Append released hosts and write 
-        free_hosts = free_host + allocated_hosts
+        free_hosts = free_hosts + allocated_hosts
         redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
         # Remove resources from current subarray. 
         redis_tools.write_list_redis(self.red, 
@@ -372,7 +372,7 @@ class Coordinator(object):
             log.warning('Cannot acquire {}'.format(host_key))
         return dwell_time
 
-    def get_pkt_idx(host_key):
+    def get_pkt_idx(self, host_key):
         """Get PKTIDX for a host (if active).
         
         Args:
@@ -385,7 +385,7 @@ class Coordinator(object):
             active host. Returns None if host is not active.
         """
         pkt_idx = None
-        host_status = self.hgetall(host_key)
+        host_status = self.red.hgetall(host_key)
         if(len(host_status) > 0):
             if('NETSTAT' in host_status):
                 if(host_status['NETSTAT'] != 'idle'):
