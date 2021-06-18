@@ -36,15 +36,14 @@ class Coordinator(object):
         self.red = redis.StrictRedis(port=redis_port, decode_responses=True)
         self.cfg_file = cfg_file
         self.triggermode = triggermode 
+        log = set_logger(log_level = logging.DEBUG)
 
     def start(self):
         """Start the coordinator, and retrieve state from Redis.
-        """
-        log = set_logger(log_level = logging.DEBUG)
-        log.info("Starting Coordinator")
+        """        
         # Configure coordinator
         try:
-            self.hashpipe_instances, self.streams_per_instance = self.conf(self.cfg_file)
+            self.hashpipe_instances, self.streams_per_instance = self.config(self.cfg_file)
             log.info('Configured from {}'.format(self.cfg_file))
         except:
             log.warning('Configuration not updated; old configuration might be present.')
@@ -186,8 +185,7 @@ class Coordinator(object):
                 self.pub_gateway_msg(red, chan_list[i], 'NSTRM', n_streams_per_instance, 
                     log, True)
                 # Absolute starting channel for instance i (SCHAN)
-                s_chan = offset*int(n_chans_per_substream) + 
-                    i*n_streams_per_instance*int(n_chans_per_substream)
+                s_chan = offset*int(n_chans_per_substream) + i*n_streams_per_instance*int(n_chans_per_substream)
                 self.pub_gateway_msg(red, chan_list[i], 'SCHAN', s_chan, log, True)
                 # Destination IP addresses for instance i (DESTIP)
                 self.pub_gateway_msg(red, chan_list[i], 'DESTIP', addr_list[i], log, True)
@@ -219,8 +217,7 @@ class Coordinator(object):
                 log, False)
         # Set PKTSTART separately after all the above messages have 
         # all been delivered:
-        pkt_idx_start = get_start_idx(self.red, allocated_hosts, 
-                PKTIDX_MARGIN, log)
+        pkt_idx_start = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log)
         for i in range(len(chan_list)):
             self.pub_gateway_msg(self.red, chan_list[i], 'PKTSTART', 
                 pkt_idx_start, log, False)
@@ -375,7 +372,7 @@ class Coordinator(object):
             log.warning('Cannot acquire {}'.format(host_key))
         return dwell_time
 
-    def get_pkt_idx(self.red_server, host_key):
+    def get_pkt_idx(host_key):
         """Get PKTIDX for a host (if active).
         
         Args:
@@ -388,7 +385,7 @@ class Coordinator(object):
             active host. Returns None if host is not active.
         """
         pkt_idx = None
-        host_status = red_server.hgetall(host_key)
+        host_status = self.hgetall(host_key)
         if(len(host_status) > 0):
             if('NETSTAT' in host_status):
                 if(host_status['NETSTAT'] != 'idle'):
@@ -402,7 +399,7 @@ class Coordinator(object):
             log.warning('Cannot acquire {}'.format(host_key))
         return pkt_idx
 
-    def get_start_idx(self, red_server, host_list, idx_margin, log):
+    def get_start_idx(self, host_list, idx_margin, log):
         """Calculate the packet index at which recording should begin
         (synchronously) for all processing nodes.
     
@@ -422,11 +419,11 @@ class Coordinator(object):
         pkt_idxs = []
         for host in host_list:
             host_key = '{}://{}/status'.format(HPGDOMAIN, host)
-            pkt_idx = get_pkt_idx(red_server, host_key)
+            pkt_idx = self.get_pkt_idx(host_key)
             if(pkt_idx is not None):
                 pkt_idxs = pkt_idxs + [pkt_idx]
         if(len(pkt_idxs) > 0):
-            start_pkt = select_pkt_start(pkt_idxs, log, idx_margin)
+            start_pkt = self.select_pkt_start(pkt_idxs, log, idx_margin)
             return start_pkt
         else:
             log.warning('No active processing nodes. Cannot set PKTIDX')
