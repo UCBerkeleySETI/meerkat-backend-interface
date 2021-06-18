@@ -32,7 +32,6 @@ class Coordinator(object):
        see appendix B in https://arxiv.org/pdf/1906.07391.pdf
     """
 
-
     def __init__(self, redis_port, cfg_file, triggermode):
         self.red = redis.StrictRedis(port=redis_port, decode_responses=True)
         self.cfg_file = cfg_file
@@ -41,9 +40,6 @@ class Coordinator(object):
     def start(self):
         """Start the coordinator, and retrieve state from Redis.
         """
-        # Read last state
-        # Detect current state
-        # move to current state in sequenc if need be.
         log = set_logger(log_level = logging.DEBUG)
         log.info("Starting Coordinator")
         # Configure coordinator
@@ -841,23 +837,3 @@ class Coordinator(object):
             addr_list.append(prefix + '.{}+{}'.format(suffix0, 
                 n_addrs - 1 - i*streams_per_instance))
         return addr_list
-
-    def update_obs_state(self):
-        """Read coordinator state and reconcile with current observation
-        state as read from MeerKAT.
-        """
-        # Fetch list of configured subarrays (as known by the coordinator)
-        # Set up coordinator:
-        # 1. Read state
-        #    - list of configured subarrays
-        #         - list of configured subarrays
-        #         - list of instances per subarray
-        #    - list of available instances    
-
-        #    - fetch last observation state: configured, tracking, deconfigured
-        #    - fetch current telescope state: configured, tracking, deconfigured
-
-        #    - If array is already configured, we must not subscribe (and so we have missed it).
-        #    - If need to deconfigure and release resources, do so.
-        #    - If need to transition to track, do so. 
-        #    - If need to transition out of track, do so. 
