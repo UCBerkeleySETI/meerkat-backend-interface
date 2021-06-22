@@ -28,7 +28,16 @@ SLACK_CHANNEL = 'meerkat-obs-log'
 PROXY_CHANNEL = 'slack-messages'
 
 class Coordinator(object):
-    """For further information on the Hashpipe-Redis gateway messages, please 
+    """This class is used to coordinate receiving and recording F-engine data
+       during commensal observations with MeerKAT. It communicates with the 
+       processing nodes via the Hashpipe-Redis gateway [1]. 
+
+       The coordinator automatically assigns computing resources to each 
+       subarray, and responds to observation stages for each. As the required 
+       metadata becomes available, it is published to the appropriate processing
+       nodes. 
+   
+       [1] For further information on the Hashpipe-Redis gateway messages, please 
        see appendix B in https://arxiv.org/pdf/1906.07391.pdf
     """
 
@@ -102,14 +111,17 @@ class Coordinator(object):
             sys.exit(1)
     
     def conf_complete(self, description, value):
-        """Full description here. 
-
+        """This function is run when a new subarray is configured and the 
+        katportal_server has retrieved all the associated metadata required 
+        for the processing nodes to ingest and record data from the F-engines. 
+        
         For further information on the Hashpipe-Redis gateway messages, please 
         see appendix B in https://arxiv.org/pdf/1906.07391.pdf
 
-        Run this function once the KATPortal Server has retrieved all the 
-        sensor values necessary for configuring the backends via the 
-        Hashpipe-Redis Gateway. 
+        Args:
+            description (str): 
+        
+
         """
         # This is the identifier for the subarray that has completed configuration.
         product_id = description
