@@ -309,9 +309,8 @@ class Coordinator(object):
         # Append released hosts and write 
         free_hosts = free_hosts + allocated_hosts
         redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
-        # Remove resources from current subarray. 
-        redis_tools.write_list_redis(self.red, 
-                'coordinator:allocated_hosts:{}'.format(description), [])
+        # Remove resources from current subarray 
+        self.red.delete('coordinator:allocated_hosts:{}'.format(description))
         log.info("Released {} hosts; {} hosts available".format(len(allocated_hosts), 
                 len(free_hosts)))
                     
