@@ -102,7 +102,7 @@ class Coordinator(object):
                     self.tracking_stop(description) 
                 # If pointing updates are received during tracking
                 elif('pos_request_base' in description):
-                    self.pointing_update(self, msg_type, description, value)
+                    self.pointing_update(msg_type, description, value)
         except KeyboardInterrupt:
             log.info("Stopping coordinator")
             sys.exit(0)
