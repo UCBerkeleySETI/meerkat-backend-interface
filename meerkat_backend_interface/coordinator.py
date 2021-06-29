@@ -219,7 +219,21 @@ class Coordinator(object):
                 self.pub_gateway_msg(self.red, chan_list[i], 'DESTIP', addr_list[i], log, True)
 
     def tracking_start(self, product_id):
-        """Tracking
+        """When a subarray is on source and begins tracking, and the F-engine
+           data is trustworthy, this function instructs the processing nodes
+           to begin recording data.
+
+           Data recording is initiated by issuing a PKTSTART value to the 
+           processing nodes in question via the Hashpipe-Redis gateway [1].
+          
+           In addition, other appropriate metadata is published to the 
+           processing nodes via the Hashpipe-Redis gateway. 
+
+           Args:
+               
+               product_id (str): name of current subarray. 
+           
+           [1] https://arxiv.org/pdf/1906.07391.pdf
         """
         # Get list of allocated hosts for this subarray:
         array_key = 'coordinator:allocated_hosts:{}'.format(product_id)
