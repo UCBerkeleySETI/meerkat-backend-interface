@@ -91,7 +91,7 @@ class Coordinator(object):
                 # If all the sensor values required on configure have been
                 # successfully fetched by the katportalserver
                 elif(msg_type == 'conf_complete'):
-                    self.conf_complete(description, value)
+                    self.conf_complete(description)
                 # If the current subarray is deconfigured, instruct processing nodes
                 # to unsubscribe from their respective streams.
                 # Only instruct processing nodes in the current subarray to unsubscribe.
@@ -121,7 +121,7 @@ class Coordinator(object):
             log.error(e)
             sys.exit(1)
     
-    def conf_complete(self, description, value):
+    def conf_complete(self, description):
         """This function is run when a new subarray is configured and the 
            katportal_server has retrieved all the associated metadata required 
            for the processing nodes to ingest and record data from the F-engines. 
@@ -137,8 +137,6 @@ class Coordinator(object):
                
                description (str): the second field of the Redis message, which 
                in this case is the name of the current subarray. 
-        
-               value (str): 
 
         """
         # This is the identifier for the subarray that has completed configuration.
