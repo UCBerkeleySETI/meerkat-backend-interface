@@ -48,7 +48,18 @@ class Coordinator(object):
         log = set_logger(log_level = logging.DEBUG)
 
     def start(self):
-        """Start the coordinator, and retrieve state from Redis.
+        """Start the coordinator as follows:
+
+           - The list of available Hashpipe instances and the number of streams per 
+             instance are retrieved from the main configuration .yml file. 
+
+           - The number of available instances/hosts is read from the appropriate Redis key. 
+           
+           - Subscriptions are made to the three Redis channels.  
+           
+           - Incoming messages trigger the appropriate function for the stage of the 
+             observation. The contents of the messages (if any) are sent to the 
+             appropriate function. 
         """        
         # Configure coordinator
         try:
@@ -112,15 +123,22 @@ class Coordinator(object):
     
     def conf_complete(self, description, value):
         """This function is run when a new subarray is configured and the 
-        katportal_server has retrieved all the associated metadata required 
-        for the processing nodes to ingest and record data from the F-engines. 
-        
-        For further information on the Hashpipe-Redis gateway messages, please 
-        see appendix B in https://arxiv.org/pdf/1906.07391.pdf
+           katportal_server has retrieved all the associated metadata required 
+           for the processing nodes to ingest and record data from the F-engines. 
 
-        Args:
-            description (str): 
+           The required metadata is published to the Hashpipe-Redis gateway in 
+           the key-value pair format described in Appendix B of: 
+           https://arxiv.org/pdf/1906.07391.pdf
+
+           Notably, the DESTIP value is set for each processing node - the IP 
+           address of the multicast group it is to join. 
+
+           Args:
+               
+               description (str): the second field of the Redis message, which 
+               in this case is the name of the current subarray. 
         
+               value (str): 
 
         """
         # This is the identifier for the subarray that has completed configuration.
