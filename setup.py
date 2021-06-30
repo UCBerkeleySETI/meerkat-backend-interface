@@ -23,7 +23,7 @@ setuptools.setup(
     long_description=open("README.md").read(),
 
     py_modules=[
-        'coordinator',
+        'coordinator_start',
         'katcp_start',
         'katportal_start',
         'slack_proxy_start',
@@ -42,7 +42,7 @@ setuptools.setup(
 
     entry_points={
         'console_scripts': [
-            'coordinator = coordinator:cli',
+            'coordinator_start = coordinator_start:cli',
             'katcp_start = katcp_start:cli',
             'katportal_start = katportal_start:cli',
             'slack_proxy_start = slack_proxy_start:cli',
