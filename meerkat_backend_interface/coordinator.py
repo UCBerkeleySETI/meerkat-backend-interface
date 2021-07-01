@@ -42,6 +42,19 @@ class Coordinator(object):
     """
 
     def __init__(self, redis_port, cfg_file, triggermode):
+        """Initialise the coordinator.
+
+           Args:
+               redis_port (str): Redis port to listen on. 
+               cfg_file (str): path to the .yml configuration file which
+               (among other things) provides a list of available hosts. 
+               triggermode (str): the desired trigger mode on startup is 
+               set. Options include:
+                   \'idle\': PKTSTART will not be sent.
+                   \'auto\': PKTSTART will be sent each time a target is tracked.
+                   \'armed\': PKTSTART will only be sent for the next target. 
+                   Thereafter, the state will transition to idle.'
+        """
         self.red = redis.StrictRedis(port=redis_port, decode_responses=True)
         self.cfg_file = cfg_file
         self.triggermode = triggermode 
@@ -137,7 +150,6 @@ class Coordinator(object):
                
                description (str): the second field of the Redis message, which 
                in this case is the name of the current subarray. 
-
         """
         # This is the identifier for the subarray that has completed configuration.
         product_id = description
@@ -289,7 +301,18 @@ class Coordinator(object):
         self.red.set('coordinator:tracking:{}'.format(product_id), '1')
 
     def tracking_stop(self, product_id):
-        """If the subarray stops tracking, take appropriate action.
+        """If the subarray stops tracking a source (more specifically, if the incoming 
+           data is no longer to be trusted or used), the following actions are taken:
+
+           - DWELL is set to 0
+           - PKTSTART is set to 0
+           - DWELL is reset to its original value. 
+
+           This ensures that the processing nodes stop recording (if DWELL has not yet
+           already been reached). 
+
+           Args:
+               product_id (str): the name of the current subarray.
         """
         tracking_state = self.red.get('coordinator:tracking:{}'.format(product_id))
         # If tracking state transitions from 'track' to any of the other states, 
@@ -316,8 +339,17 @@ class Coordinator(object):
             self.red.set('coordinator:tracking:{}'.format(product_id), '0')
 
     def deconfigure(self, description):
-        """Deconfigure the current subarray. Release hosts for future use with 
-        other subarrays. 
+        """If the current subarray is deconfigured, the following steps are taken:
+           
+           - For the hosts associated with the current subarray, DESTIP is set to 
+             0.0.0.0 - this ensures that they unsubscribe from the multicast group
+             and stop receiving raw voltage data from the F-engines. 
+
+           - These hosts are then released back into the pool of available hosts 
+             for allocation to other subarrays. 
+
+           Args:
+              description (str): the name of the current subarray. 
         """
         # Fetch hosts allocated to this subarray:
         # Note description equivalent to product_id here
@@ -347,6 +379,16 @@ class Coordinator(object):
     def data_suspect(self, description, value): 
         """Parse and publish data-suspect mask to the appropriate 
         processing nodes.
+
+        The data-suspect mask provides a global indication of whether or not
+        the data from each polarisation from each F-engine can be trusted. A 
+        number of parameters are included in this determination (including 
+        whether or not a source is being tracked). Please see MeerKAT CAM 
+        documentation for further information. 
+
+        Args:
+            description (str): the name of the current subarray. 
+            value (str): the data-suspect bitmask. 
         """
         bitmask = '#{:x}'.format(int(value, 2))
         # Fetch hosts allocated to this subarray:
@@ -361,7 +403,15 @@ class Coordinator(object):
 
     def pointing_update(self, msg_type, description, value):
         """Update pointing information during an observation, and publish 
-        results into the Hashpipe-Redis gateway status buffer. 
+        results into the Hashpipe-Redis gateway status buffer for the specific
+        set of processing nodes allocated to the current subarray. These values 
+        include RA, Dec, Az and El and are updated continuously as they change.
+
+        Args:
+           msg_type (str): currently indicates the name of the current subarray. 
+           (to change in future for consistency). 
+           description (str): type of pointing information to update. 
+           value (str): the value of the pointing information to update. 
         """
         # NOTE: here, msg_type represents product_id. Need to fix this inconsistent
         # naming convention. 
@@ -506,13 +556,28 @@ class Coordinator(object):
 
     def host_list(self, hpgdomain, hosts):
         """Build a list of Hashpipe-Redis Gateway channels from a list 
-        of host names. 
+           of host names.
+
+           Args:
+              hpgdomain (str): Hashpipe-Redis Gateway domain (e.g. 'bluse'). 
+              hosts (list): list of hosts.
+
+           Returns:
+              channel_list (list): list of Hashpipe-Redis Gateway channels.
         """
         channel_list = [hpgdomain + '://' + host + '/set' for host in hosts]
         return channel_list
 
     def target(self, product_id):
         """Get target name and coordinates.
+
+           Args:
+              product_id (str): the name of the current subarray.
+
+           Returns:
+              target_str (str): target string including name/description. 
+              ra_str (str): RA of current pointing in sexagesimal form.
+              dec_str (str): Dec of current pointing in sexagesimal form. 
         """
         ant_key = '{}:antennas'.format(product_id) 
         ant_list = self.red.lrange(ant_key, 0, self.red.llen(ant_key))
@@ -570,9 +635,19 @@ class Coordinator(object):
         return(target_name, ra_str, dec_str)
 
     def get_target(self, product_id, target_key, retries, retry_duration):
-        """
-        Try to fetch the most recent target name by comparing its timestamp
-        to that of the most recent capture-start message.
+        """Try to fetch the most recent target name by comparing its timestamp
+           to that of the most recent capture-start message.
+
+           Args:
+              product_id (str): name of the current subarray. 
+              target_key (str): Redis key for the current target. 
+              retries (int): number of times to attempt fetching the new 
+              target name. 
+              retry_duration (float): time (s) to wait between retries. 
+           
+           Returns:
+               target (str): current target name - defaults to 'UNKNOWN' 
+               if no new target name is available. 
         """
         for i in range(retries):
             last_target = float(self.red.get("{}:last-target".format(product_id)))
@@ -592,8 +667,10 @@ class Coordinator(object):
 
     def config(self, cfg_file):
         """Configure the coordinator according to .yml config file.
+
         Args:
             cfg_file (str): File path for config file (.yml).
+        
         Returns:
             List of instances and the number of streams to be processed per 
             instance.
@@ -612,6 +689,7 @@ class Coordinator(object):
     def pub_gateway_msg(self, red_server, chan_name, msg_name, msg_val, logger, write):
         """Format and publish a hashpipe-Redis gateway message. Save messages
         in a Redis hash for later use by reconfig tool. 
+        
         Args:
             red_server: Redis server.
             chan_name (str): Name of channel to be published to. 
@@ -619,8 +697,6 @@ class Coordinator(object):
             msg_val (str): Value associated with key.
             logger: Logger. 
             write (bool): If true, also write message to Redis database.
-        Returns:
-            None
         """
         msg = '{}={}'.format(msg_name, msg_val)
         red_server.publish(chan_name, msg)
@@ -631,12 +707,22 @@ class Coordinator(object):
         logger.info('Published {} to channel {}'.format(msg, chan_name))
 
     def parse_redis_msg(self, message):
-        """Split message only twice - the format is as follows:
-           message_type:description:value
-           OR message_type:description (if there is no associated value)
+        """Process incoming Redis messages from the various pub/sub channels. 
+           Messages are formatted as follows:
+           
+               <message_type>:<description>:<value>
+           
+           OR (if there is no associated value): 
 
-           If message does not appear to fit format, return it as is. 
-           If message does f
+               <message_type>:<description>
+
+           If the message does not appear to fit the format, returns an 
+           empty string.
+
+           Args:
+              message (str): the incoming Redis message. 
+
+           Returns: 
         """
         msg_type = ''
         description = ''
@@ -799,9 +885,11 @@ class Coordinator(object):
 
     def json_str_formatter(self, str_dict):
         """Formatting for json.loads
+        
         Args:
             str_dict (str): str containing dict of spead streams (received 
             on ?configure).
+        
         Returns:
             str_dict (str): str containing dict of spead streams, formatted 
             for use with json.loads
