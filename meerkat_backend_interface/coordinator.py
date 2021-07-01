@@ -722,7 +722,12 @@ class Coordinator(object):
            Args:
               message (str): the incoming Redis message. 
 
-           Returns: 
+           Returns:
+              msg_type (str): type of incoming message (eg 'deconfigure')
+              description (str): description of incoming message (eg
+              'pos_request_base_ra')
+              value (str): value associated with incoming message (eg 
+              '14:24:32.24'
         """
         msg_type = ''
         description = ''
@@ -761,6 +766,7 @@ class Coordinator(object):
         Args:
             product_id (str): Name of the current active subarray.
             sensor (str): Short sensor name (from the .yml config file).
+
         Returns:
             stream_sensor (str): Full stream sensor name for querying 
             via KATPortal.
@@ -773,15 +779,22 @@ class Coordinator(object):
 
     def datadir(self, product_id):
         """Determine DATADIR according to the current schedule block ID. This 
-        entails retrieving the list of schedule blocks, extracting the ID of 
-        the current one and formatting it as a file path.
+           entails retrieving the list of schedule blocks, extracting the ID of 
+           the current one and formatting it as a file path.
         
-        Schedule block IDs follow the format: YYYYMMDD-XXXX where XXXX is the 
-        schedule block number (in order of assignment). To create the correct
-        DATADIR, we format it (per schedule block) as follows: 
-        DATADIR=YYYYMMDD/XXXX
-        If the schedule block ID is not known, we set it to:
-        DATADIR=Unknown_SB
+           Schedule block IDs follow the format: YYYYMMDD-XXXX where XXXX is the 
+           schedule block number (in order of assignment). To create the correct
+           DATADIR, we format it (per schedule block) as follows: 
+           DATADIR=YYYYMMDD/XXXX
+           If the schedule block ID is not known, we set it to:
+           DATADIR=Unknown_SB
+
+           Args:
+              product_id (str): the name of the current subarray
+
+           Returns:
+              datadir (str): the name of the directory in which to record
+              incoming data. 
         """
         current_sb_id = 'Unknown_SB' # Default
         try: 
@@ -799,6 +812,12 @@ class Coordinator(object):
 
     def antennas(self, product_id):
         """Number of antennas, NANTS.
+
+           Args:
+              product_id (str): the name of the current subarray.
+
+           Returns:
+              n_ants (int): the number of antennas in the current subarray. 
         """
         ant_key = '{}:antennas'.format(product_id)
         n_ants = len(self.red.lrange(ant_key, 0, self.red.llen(ant_key)))
@@ -806,6 +825,12 @@ class Coordinator(object):
         
     def chan_per_substream(self, product_id):
         """Number of channels per substream - equivalent to HNCHAN.
+
+           Args:
+              product_id (str): the name of the current subarray.
+
+           Returns:
+              n_chans_per_substream (str): the number of channels per substream. 
         """
         sensor_key = self.cbf_sensor_name(product_id, 
                 'antenna_channelised_voltage_n_chans_per_substream')   
@@ -813,7 +838,18 @@ class Coordinator(object):
         return n_chans_per_substream
 
     def spectra_per_heap(self, product_id):
-        """Number of spectra per heap (HNTIME).
+        """Number of spectra per heap (HNTIME). Please see [1] for further 
+           information on the SPEAD protocol.
+
+           [1] Manley, J., Welz, M., Parsons, A., Ratcliffe, S., & 
+           Van Rooyen, R. (2010). SPEAD: streaming protocol for exchanging 
+           astronomical data. SKA document.
+
+           Args:
+              product_id (str): the name of the current subarray.
+
+           Returns:
+              spectra_per_heap (str): the number of spectra per heap.
         """
         sensor_key = self.cbf_sensor_name(product_id,  
             'tied_array_channelised_voltage_0x_spectra_per_heap')   
@@ -821,9 +857,15 @@ class Coordinator(object):
         return spectra_per_heap
 
     def coarse_chan_bw(self, product_id, n_freq_chans):
-        """Coarse channel bandwidth (from F engines)
-        Note: no sign information!  
-        Equivalent to CHAN_BW.
+        """Coarse channel bandwidth (from F engines).
+           NOTE: no sign information! Equivalent to CHAN_BW.
+           
+           Args:
+              product_id (str): the name of the current subarray.
+              n_freq_chans (str): the number of coarse channels
+
+           Returns:
+              coarse_chan_bw (float): coarse channel bandwidth. 
         """
         sensor_key = self.cbf_sensor_name(product_id, 
             'adc_sample_rate')
@@ -833,7 +875,13 @@ class Coordinator(object):
         return coarse_chan_bw
 
     def centre_freq(self, product_id):
-        """Centre frequency (FECENTER)
+        """Centre frequency (FECENTER).
+           
+           Args:
+              product_id (str): the name of the current subarray.
+
+           Returns:
+              centre_freq (float): centre frequency of the current subarray.
         """
         sensor_key = self.stream_sensor_name(product_id,
             'antenna_channelised_voltage_centre_frequency')
