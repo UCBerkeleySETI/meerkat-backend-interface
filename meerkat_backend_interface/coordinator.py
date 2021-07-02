@@ -254,7 +254,7 @@ class Coordinator(object):
         # Build list of Hashpipe-Redis Gateway channels to publish to:
         chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
         # Send messages to these specific hosts:
-        datadir = self.datadir(product_id)
+        datadir = self.datadir(product_id, allocated_hosts)
         for i in range(len(chan_list)):
             # Publish DATADIR to gateway
             self.pub_gateway_msg(self.red, chan_list[i], 'DATADIR', datadir, 
@@ -777,7 +777,7 @@ class Coordinator(object):
             s_num, cbf_prefix, sensor)
         return stream_sensor
 
-    def datadir(self, product_id):
+    def datadir(self, product_id, host_list):
         """Determine DATADIR according to the current schedule block ID. This 
            entails retrieving the list of schedule blocks, extracting the ID of 
            the current one and formatting it as a file path.
@@ -797,6 +797,9 @@ class Coordinator(object):
               incoming data. 
         """
         current_sb_id = 'Unknown_SB' # Default
+        # Attempt to fetch the current upper directory for the data:
+        upper_dir = self.get_datadir_root(host_list)
+        # Attempt to fetch current SB 
         try: 
             sb_key = '{}:sched_observation_schedule_1'.format(product_id)
             sb_ids = self.red.get(sb_key)
@@ -806,9 +809,28 @@ class Coordinator(object):
             current_sb_id = current_sb_id.replace('-', '/')
         except:
             log.error("Schedule block IDs not available")
-            log.warning("Setting DATADIR=/buf0/Unknown_SB")
-        datadir = '/buf0/{}'.format(current_sb_id)
+            log.warning("Setting DATADIR='/{}/Unknown_SB".format(upper_dir))
+        datadir = '/{}/{}'.format(upper_dir, current_sb_id)
         return datadir
+
+    def get_datadir_root(self, host_list):
+        """Get the upper directory for DATADIR from the status buffers if 
+           available.
+        """
+        host_key = '{}://{}/status'.format(HPGDOMAIN, host_list[0])
+        self.red.hgetall(host_key)
+        upper_dir = 'buf0' # default to NVMe modules
+        if(len(host_status) > 0):
+            if('DATADIR' in host_status):
+                if(len(host_status['DATADIR']) > 0):
+                    upper_dir = host_status['DATADIR']
+                else:
+                    log.warning('No preset DATADIR for {}, defaulting to /buf0/'.format(host_key))
+            else:
+                log.warning('DATADIR not available for {}, defaulting to /buf0/'.format(host_key))
+        else:
+            log.warning('Cannot acquire {}, defaulting to /buf0/'.format(host_key))
+        return upper_dir
 
     def antennas(self, product_id):
         """Number of antennas, NANTS.
