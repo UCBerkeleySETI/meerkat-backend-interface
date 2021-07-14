@@ -579,7 +579,7 @@ class Coordinator(object):
               ra_str (str): RA of current pointing in sexagesimal form.
               dec_str (str): Dec of current pointing in sexagesimal form. 
         """
-        ant_key = '{}:antennas'.format(product_id) 
+        ant_key = '{}:antennas'.format(product_id)
         ant_list = self.red.lrange(ant_key, 0, self.red.llen(ant_key))
         target_key = "{}:{}_target".format(product_id, ant_list[0])
         target_str = self.get_target(product_id, target_key, 5, 15)
@@ -818,7 +818,7 @@ class Coordinator(object):
            available.
         """
         host_key = '{}://{}/status'.format(HPGDOMAIN, host_list[0])
-        self.red.hgetall(host_key)
+        host_status = self.red.hgetall(host_key)
         upper_dir = 'buf0' # default to NVMe modules
         if(len(host_status) > 0):
             if('DATADIR' in host_status):
