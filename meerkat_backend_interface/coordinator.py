@@ -809,8 +809,8 @@ class Coordinator(object):
             current_sb_id = current_sb_id.replace('-', '/')
         except:
             log.error("Schedule block IDs not available")
-            log.warning("Setting DATADIR='/{}/Unknown_SB".format(upper_dir))
-        datadir = '/{}/{}'.format(upper_dir, current_sb_id)
+            log.warning("Setting DATADIR='{}/Unknown_SB".format(upper_dir))
+        datadir = '{}/{}'.format(upper_dir, current_sb_id)
         return datadir
 
     def get_datadir_root(self, host_list):
@@ -819,7 +819,7 @@ class Coordinator(object):
         """
         host_key = '{}://{}/status'.format(HPGDOMAIN, host_list[0])
         host_status = self.red.hgetall(host_key)
-        upper_dir = 'buf0' # default to NVMe modules
+        upper_dir = '/buf0' # default to NVMe modules
         if(len(host_status) > 0):
             if('DATADIR' in host_status):
                 if(len(host_status['DATADIR']) > 0):
