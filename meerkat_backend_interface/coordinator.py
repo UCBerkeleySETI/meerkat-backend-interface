@@ -608,30 +608,35 @@ class Coordinator(object):
         # Assuming target name or description will always come first
         # Remove any outer single quotes for compatibility:
         target = target_string.strip('\'')
-        if('radec target' in target):
-            target = target.split('radec target,') # Split at 'radec target'
+        if('radec' in target):
+            target = target.split(',') # Split by comma separator
+            # Check if target name or description present
+            if(len(target) < 4): 
+                target_name = 'NOT_PROVIDED'
+                # RA_STR and DEC_STR
+                ra_str = target[1].strip()
+                dec_str = target[2].strip()
+            else:
+                target_name = target[0].split(delimiter)[0] # Split at specified delimiter
+                target_name = target_name.strip() # Remove leading and trailing whitespace
+                target_name = target_name.strip(",") # Remove trailing comma
+                # Punctuation below taken from string.punctuation()
+                # Note that + and - have been removed (relevant to coordinate names)
+                punctuation = "!\"#$%&\'()*,./:;<=>?@[\\]^_`{|}~" 
+                # Replace all punctuation with underscores
+                table = str.maketrans(punctuation, '_'*30)
+                target_name = target_name.translate(table)
+                # Limit target string to max allowable in headers (68 chars)
+                target_name = target_name[0:length]
+                # RA_STR and DEC_STR
+                ra_str = target[2].strip()
+                dec_str = target[3].strip()
         else:
-            target = target.split('radec,') # Split at 'radec tar'
-        # Target:
-        if(target[0].strip() == ''): # if no target field
-            # strip twice for python compatibility
-            target_name = 'NOT_PROVIDED'
-        else:
-            target_name = target[0].split(delimiter)[0] # Split at specified delimiter
-            target_name = target_name.strip() # Remove leading and trailing whitespace
-            target_name = target_name.strip(",") # Remove trailing comma
-            # Punctuation below taken from string.punctuation()
-            # Note that + and - have been removed (relevant to coordinate names)
-            punctuation = "!\"#$%&\'()*,./:;<=>?@[\\]^_`{|}~" 
-            # Replace all punctuation with underscores
-            table = str.maketrans(punctuation, '_'*30)
-            target_name = target_name.translate(table)
-            # Limit target string to max allowable in headers (68 chars)
-            target_name = target_name[0:length]
-        # RA_STR and DEC_STR
-        radec = target[1].split(',')
-        ra_str = radec[0].strip()
-        dec_str = radec[1].strip()
+            # We are unsure of target format since no radec field provided. 
+            log.warning("Target name and description incomplete.")
+            target_name = "UNKNOWN"
+            ra_str = "UNKNOWN"
+            dec_str = "UNKNOWN"
         return(target_name, ra_str, dec_str)
 
     def get_target(self, product_id, target_key, retries, retry_duration):
