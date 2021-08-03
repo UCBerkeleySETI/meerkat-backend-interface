@@ -835,6 +835,9 @@ class Coordinator(object):
                 log.warning('DATADIR not available for {}, defaulting to /buf0/'.format(host_key))
         else:
             log.warning('Cannot acquire {}, defaulting to /buf0/'.format(host_key))
+        # Take only the first part of the file path, since it is dynamically
+        # changed along with the changing schedule blocks (see function datadir above).
+        upper_dir = '/'.join(upper_dir.split('/', 2)[:2])
         return upper_dir
 
     def antennas(self, product_id):
