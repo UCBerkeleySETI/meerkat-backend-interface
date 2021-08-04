@@ -164,13 +164,10 @@ class Coordinator(object):
         # Generate list of stream IP addresses and publish appropriate messages to 
         # processing nodes:
         addr_list, port, n_addrs, n_red_chans = self.ip_addresses(product_id, offset)
-        # Allocate hosts:
-        free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
-                self.red.llen('coordinator:free_hosts'))
         # Allocate hosts for the current subarray:
-        if(len(free_hosts) == 0):
-            log.warning("No free resources, cannot process data from {}".format(product_id))
-        else:
+        if(self.red.exists('coordinator:free_hosts')): # If key exists, there are free hosts
+            free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
+                self.red.llen('coordinator:free_hosts'))
             allocated_hosts = free_hosts[0:n_red_chans]
             redis_tools.write_list_redis(self.red, 
                     'coordinator:allocated_hosts:{}'.format(product_id), allocated_hosts)
@@ -178,10 +175,11 @@ class Coordinator(object):
             # NOTE: in future, append/pop with Redis commands instead of write_list_redis
             if(len(free_hosts) < n_red_chans):
                 log.warning("Insufficient resources to process full band for {}".format(product_id))
-                free_hosts = [] # Empty
+                # Delete the key (no empty lists in Redis)
+                self.red.delete('coordinator:free_hosts')
             else:
                 free_hosts = free_hosts[n_red_chans:]
-            redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
+                redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
             log.info('Allocated {} hosts to {}'.format(n_red_chans, product_id))
             # Build list of Hashpipe-Redis Gateway channels to publish to:
             chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
@@ -229,6 +227,9 @@ class Coordinator(object):
                 self.pub_gateway_msg(self.red, chan_list[i], 'SCHAN', s_chan, log, True)
                 # Destination IP addresses for instance i (DESTIP)
                 self.pub_gateway_msg(self.red, chan_list[i], 'DESTIP', addr_list[i], log, True)
+        else:
+            # If key does not exist, there are no free hosts. 
+            log.warning("No free resources, cannot process data from {}".format(product_id))
 
     def tracking_start(self, product_id):
         """When a subarray is on source and begins tracking, and the F-engine
@@ -366,8 +367,11 @@ class Coordinator(object):
         # NOTE: in future, get rid of write_list_redis function and append or pop. 
         # This will simplify this step. 
         # Get list of currently available hosts:
-        free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
+        if(self.red.exists('coordinator:free_hosts')):
+            free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
                 self.red.llen('coordinator:free_hosts'))
+        else:
+            free_hosts = 0
         # Append released hosts and write 
         free_hosts = free_hosts + allocated_hosts
         redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
