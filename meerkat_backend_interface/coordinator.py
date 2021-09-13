@@ -183,50 +183,57 @@ class Coordinator(object):
             log.info('Allocated {} hosts to {}'.format(n_red_chans, product_id))
             # Build list of Hashpipe-Redis Gateway channels to publish to:
             chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
-            # Apply to processing nodes
-            # NOTE: can we address multiple processing nodes more easily?
+            # Create Hashpipe-Redis Gateway group for current subarray:
+            # Using groups feature (please see rb-hashpipe documentation).
+            # This group will be given the name of the current subarray. 
+            # The group can be addressed as follows: <HPGDOMAIN>:<group>///set
             for i in range(len(chan_list)):
-                # Port (BINDPORT)
-                self.pub_gateway_msg(self.red, chan_list[i], 'BINDPORT', port, log, True)        
-                # Total number of streams (FENSTRM)
-                self.pub_gateway_msg(self.red, chan_list[i], 'FENSTRM', n_addrs, log, True)
-                # Sync time (UNIX, seconds)
-                t_sync = self.sync_time(product_id)
-                self.pub_gateway_msg(self.red, chan_list[i], 'SYNCTIME', t_sync, log, True)
-                # Centre frequency (FECENTER)
-                fecenter = self.centre_freq(product_id) 
-                self.pub_gateway_msg(self.red, chan_list[i], 'FECENTER', fecenter, log, True)
-                # Total number of frequency channels (FENCHAN)    
-                n_freq_chans = self.red.get('{}:n_channels'.format(product_id))
-                self.pub_gateway_msg(self.red, chan_list[i], 'FENCHAN', n_freq_chans, log, True)
-                # Coarse channel bandwidth (from F engines)
-                # Note: no sign information! 
-                # (CHAN_BW)
-                chan_bw = self.coarse_chan_bw(product_id, n_freq_chans)
-                self.pub_gateway_msg(self.red, chan_list[i], 'CHAN_BW', chan_bw, log, True) 
-                # Number of channels per substream (HNCHAN)
-                hnchan = self.chan_per_substream(product_id)
-                self.pub_gateway_msg(self.red, chan_list[i], 'HNCHAN', hnchan, log, True)
-                # Number of spectra per heap (HNTIME)
-                hntime = self.spectra_per_heap(product_id)
-                self.pub_gateway_msg(self.red, chan_list[i], 'HNTIME', hntime, log, True)
-                # Number of ADC samples per heap (HCLOCKS)
-                adc_per_heap = self.samples_per_heap(product_id, hntime)
-                self.pub_gateway_msg(self.red, chan_list[i], 'HCLOCKS', adc_per_heap, log, True)
-                # Number of antennas (NANTS)
-                n_ants = self.antennas(product_id)
-                self.pub_gateway_msg(self.red, chan_list[i], 'NANTS', n_ants, log, True)
-                # Set PKTSTART to 0 on configure
-                self.pub_gateway_msg(self.red, chan_list[i], 'PKTSTART', 0, log, True)
-                # Number of streams for instance i (NSTRM)
-                n_streams_per_instance = int(addr_list[i][-1])+1
-                self.pub_gateway_msg(self.red, chan_list[i], 'NSTRM', n_streams_per_instance, 
+                self.pub_gateway_msg(self.red, chan_list[i], 'join', product_id, log, True)
+            
+            # Apply to processing nodes
+            subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
+            
+            # Port (BINDPORT)
+            self.pub_gateway_msg(self.red, subarray_group, 'BINDPORT', port, log, True)        
+            # Total number of streams (FENSTRM)
+            self.pub_gateway_msg(self.red, subarray_group, 'FENSTRM', n_addrs, log, True)
+            # Sync time (UNIX, seconds)
+            t_sync = self.sync_time(product_id)
+            self.pub_gateway_msg(self.red, subarray_group, 'SYNCTIME', t_sync, log, True)
+            # Centre frequency (FECENTER)
+            fecenter = self.centre_freq(product_id) 
+            self.pub_gateway_msg(self.red, subarray_group, 'FECENTER', fecenter, log, True)
+            # Total number of frequency channels (FENCHAN)    
+            n_freq_chans = self.red.get('{}:n_channels'.format(product_id))
+            self.pub_gateway_msg(self.red, subarray_group, 'FENCHAN', n_freq_chans, log, True)
+            # Coarse channel bandwidth (from F engines)
+            # Note: no sign information! 
+            # (CHAN_BW)
+            chan_bw = self.coarse_chan_bw(product_id, n_freq_chans)
+            self.pub_gateway_msg(self.red, subarray_group, 'CHAN_BW', chan_bw, log, True) 
+            # Number of channels per substream (HNCHAN)
+            hnchan = self.chan_per_substream(product_id)
+            self.pub_gateway_msg(self.red, subarray_group, 'HNCHAN', hnchan, log, True)
+            # Number of spectra per heap (HNTIME)
+            hntime = self.spectra_per_heap(product_id)
+            self.pub_gateway_msg(self.red, subarray_group, 'HNTIME', hntime, log, True)
+            # Number of ADC samples per heap (HCLOCKS)
+            adc_per_heap = self.samples_per_heap(product_id, hntime)
+            self.pub_gateway_msg(self.red, subarray_group, 'HCLOCKS', adc_per_heap, log, True)
+            # Number of antennas (NANTS)
+            n_ants = self.antennas(product_id)
+            self.pub_gateway_msg(self.red, subarray_group, 'NANTS', n_ants, log, True)
+            # Set PKTSTART to 0 on configure
+            self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 0, log, True)
+            # Number of streams for instance i (NSTRM)
+            n_streams_per_instance = int(addr_list[i][-1])+1
+            self.pub_gateway_msg(self.red, subarray_group, 'NSTRM', n_streams_per_instance, 
                     log, True)
-                # Absolute starting channel for instance i (SCHAN)
-                s_chan = offset*int(hnchan) + i*n_streams_per_instance*int(hnchan)
-                self.pub_gateway_msg(self.red, chan_list[i], 'SCHAN', s_chan, log, True)
-                # Destination IP addresses for instance i (DESTIP)
-                self.pub_gateway_msg(self.red, chan_list[i], 'DESTIP', addr_list[i], log, True)
+            # Absolute starting channel for instance i (SCHAN)
+            s_chan = offset*int(hnchan) + i*n_streams_per_instance*int(hnchan)
+            self.pub_gateway_msg(self.red, subarray_group, 'SCHAN', s_chan, log, True)
+            # Destination IP addresses for instance i (DESTIP)
+            self.pub_gateway_msg(self.red, subarray_group, 'DESTIP', addr_list[i], log, True)
         else:
             # If key does not exist, there are no free hosts. 
             log.warning("No free resources, cannot process data from {}".format(product_id))
@@ -251,31 +258,31 @@ class Coordinator(object):
         # Get list of allocated hosts for this subarray:
         array_key = 'coordinator:allocated_hosts:{}'.format(product_id)
         allocated_hosts = self.red.lrange(array_key, 0, 
-                self.red.llen(array_key))
-        # Build list of Hashpipe-Redis Gateway channels to publish to:
-        chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
+            self.red.llen(array_key))
+
+        subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
+
         # Send messages to these specific hosts:
         datadir = self.datadir(product_id, allocated_hosts)
-        for i in range(len(chan_list)):
-            # Publish DATADIR to gateway
-            self.pub_gateway_msg(self.red, chan_list[i], 'DATADIR', datadir, 
-                log, False)
-            # Target information:
-            target_str, ra_str, dec_str = self.target(product_id)
-            # SRC_NAME:
-            self.pub_gateway_msg(self.red, chan_list[i], 'SRC_NAME', target_str, 
-                log, False)
-            # RA_STR and DEC_STR 
-            self.pub_gateway_msg(self.red, chan_list[i], 'RA_STR', ra_str, 
-                log, False)
-            self.pub_gateway_msg(self.red, chan_list[i], 'DEC_STR', dec_str, 
-                log, False)
+        
+        # Publish DATADIR to gateway
+        self.pub_gateway_msg(self.red, subarray_group, 'DATADIR', datadir, 
+            log, False)
+        # Target information:
+        target_str, ra_str, dec_str = self.target(product_id)
+        # SRC_NAME:
+        self.pub_gateway_msg(self.red, subarray_group, 'SRC_NAME', target_str, 
+            log, False)
+        # RA_STR and DEC_STR 
+        self.pub_gateway_msg(self.red, subarray_group, 'RA_STR', ra_str, 
+            log, False)
+        self.pub_gateway_msg(self.red, subarray_group, 'DEC_STR', dec_str, 
+            log, False)
         # Set PKTSTART separately after all the above messages have 
         # all been delivered:
         pkt_idx_start = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log)
-        for i in range(len(chan_list)):
-            self.pub_gateway_msg(self.red, chan_list[i], 'PKTSTART', 
-                pkt_idx_start, log, False)
+        self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 
+            pkt_idx_start, log, False)
         # Alert via slack:
         slack_message = "{}::meerkat:: New recording started for {}!".format(SLACK_CHANNEL, product_id)
         self.red.publish(PROXY_CHANNEL, slack_message)
@@ -325,6 +332,10 @@ class Coordinator(object):
                 self.red.llen(array_key))
             # Build list of Hashpipe-Redis Gateway channels to publish to:
             chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
+
+            # NOTE: check how to alter here. 
+            #subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
+
             # Send messages to these specific hosts:
             for i in range(len(chan_list)):
                 # For the moment during testing, get dwell time from each
@@ -359,13 +370,20 @@ class Coordinator(object):
                 self.red.llen(array_key))
         # Build list of Hashpipe-Redis Gateway channels to publish to:
         chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
+
+
+        # Current subarray group:       
+        subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
+
         # Send deconfigure message to these specific hosts:
-        for i in range(len(chan_list)):
-            self.pub_gateway_msg(self.red, chan_list[i], 'DESTIP', '0.0.0.0', log, False)
+        self.pub_gateway_msg(self.red, subarray_group, 'DESTIP', '0.0.0.0', log, False)
         log.info('Subarray {} deconfigured'.format(description))
         # Release hosts:
         # NOTE: in future, get rid of write_list_redis function and append or pop. 
-        # This will simplify this step. 
+        # This will simplify this step.
+        for i in range(len(chan_list)):
+            self.pub_gateway_msg(self.red, chan_list[i], 'leave', product_id, log, True)
+
         # Get list of currently available hosts:
         if(self.red.exists('coordinator:free_hosts')):
             free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
@@ -395,15 +413,12 @@ class Coordinator(object):
             value (str): the data-suspect bitmask. 
         """
         bitmask = '#{:x}'.format(int(value, 2))
-        # Fetch hosts allocated to this subarray:
         # Note description equivalent to product_id here
-        array_key = 'coordinator:allocated_hosts:{}'.format(description)
-        allocated_hosts = self.red.lrange(array_key, 0, self.red.llen(array_key))
-        chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
-        for i in range(len(chan_list)):
-            # NOTE: Question: do we want to publish the entire bitmask to each 
-            # processing node?
-            self.pub_gateway_msg(self.red, chan_list[i], 'FESTATUS', bitmask, log, False)
+        # Current Hashpipe-Redis Gateway group name:
+        subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
+        # NOTE: Question: do we want to publish the entire bitmask to each 
+        # processing node?
+        self.pub_gateway_msg(self.red, subarray_group, 'FESTATUS', bitmask, log, False)
 
     def pointing_update(self, msg_type, description, value):
         """Update pointing information during an observation, and publish 
