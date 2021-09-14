@@ -373,7 +373,7 @@ class Coordinator(object):
 
 
         # Current subarray group:       
-        subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
+        subarray_group = '{}:{}///set'.format(HPGDOMAIN, description)
 
         # Send deconfigure message to these specific hosts:
         self.pub_gateway_msg(self.red, subarray_group, 'DESTIP', '0.0.0.0', log, False)
@@ -382,7 +382,7 @@ class Coordinator(object):
         # NOTE: in future, get rid of write_list_redis function and append or pop. 
         # This will simplify this step.
         for i in range(len(chan_list)):
-            self.pub_gateway_msg(self.red, chan_list[i], 'leave', product_id, log, True)
+            self.pub_gateway_msg(self.red, chan_list[i], 'leave', description, log, True)
 
         # Get list of currently available hosts:
         if(self.red.exists('coordinator:free_hosts')):
