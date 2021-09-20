@@ -415,7 +415,7 @@ class Coordinator(object):
         bitmask = '#{:x}'.format(int(value, 2))
         # Note description equivalent to product_id here
         # Current Hashpipe-Redis Gateway group name:
-        subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
+        subarray_group = '{}:{}///set'.format(HPGDOMAIN, description)
         # NOTE: Question: do we want to publish the entire bitmask to each 
         # processing node?
         self.pub_gateway_msg(self.red, subarray_group, 'FESTATUS', bitmask, log, False)
