@@ -181,14 +181,13 @@ class Coordinator(object):
                 free_hosts = free_hosts[n_red_chans:]
                 redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
             log.info('Allocated {} hosts to {}'.format(n_red_chans, product_id))
-            # Build list of Hashpipe-Redis Gateway channels to publish to:
-            chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
             # Create Hashpipe-Redis Gateway group for current subarray:
             # Using groups feature (please see rb-hashpipe documentation).
             # This group will be given the name of the current subarray. 
             # The group can be addressed as follows: <HPGDOMAIN>:<group>///set
-            for i in range(len(chan_list)):
-                self.pub_gateway_msg(self.red, chan_list[i], 'join', product_id, log, True)
+            for i in range(len(allocated_hosts)):
+                chan_name = '{}://{}/gateway'.format(HPGDOMAIN, allocated_hosts[i])
+                self.pub_gateway_msg(self.red, chan_name, 'join', product_id, log, True)
             
             # Apply to processing nodes
             subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
@@ -371,7 +370,6 @@ class Coordinator(object):
         # Build list of Hashpipe-Redis Gateway channels to publish to:
         chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
 
-
         # Current subarray group:       
         subarray_group = '{}:{}///set'.format(HPGDOMAIN, description)
 
@@ -379,10 +377,9 @@ class Coordinator(object):
         self.pub_gateway_msg(self.red, subarray_group, 'DESTIP', '0.0.0.0', log, False)
         log.info('Subarray {} deconfigured'.format(description))
         # Release hosts:
-        # NOTE: in future, get rid of write_list_redis function and append or pop. 
-        # This will simplify this step.
-        for i in range(len(chan_list)):
-            self.pub_gateway_msg(self.red, chan_list[i], 'leave', description, log, True)
+        for i in range(len(allocated_hosts)):
+            chan_name = '{}://{}/gateway'.format(HPGDOMAIN, allocated_hosts[i])
+            self.pub_gateway_msg(self.red, chan_name, 'leave', product_id, log, True)
 
         # Get list of currently available hosts:
         if(self.red.exists('coordinator:free_hosts')):
@@ -392,6 +389,8 @@ class Coordinator(object):
             free_hosts = 0
         # Append released hosts and write 
         free_hosts = free_hosts + allocated_hosts
+        # NOTE: in future, get rid of write_list_redis function and append or pop. 
+        # This will simplify this step.
         redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
         # Remove resources from current subarray 
         self.red.delete('coordinator:allocated_hosts:{}'.format(description))
