@@ -224,15 +224,21 @@ class Coordinator(object):
             self.pub_gateway_msg(self.red, subarray_group, 'NANTS', n_ants, log, True)
             # Set PKTSTART to 0 on configure
             self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 0, log, True)
-            # Number of streams for instance i (NSTRM)
-            n_streams_per_instance = int(addr_list[i][-1])+1
-            self.pub_gateway_msg(self.red, subarray_group, 'NSTRM', n_streams_per_instance, 
+
+            # Individually address processing nodes in subarray group where necessary:
+            # Build list of Hashpipe-Redis Gateway channels to publish to:
+            chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
+
+            for i in range(0, len(chan_list)):
+                # Number of streams for instance i (NSTRM)
+                n_streams_per_instance = int(addr_list[i][-1])+1
+                self.pub_gateway_msg(self.red, chan_list[i], 'NSTRM', n_streams_per_instance, 
                     log, True)
-            # Absolute starting channel for instance i (SCHAN)
-            s_chan = offset*int(hnchan) + i*n_streams_per_instance*int(hnchan)
-            self.pub_gateway_msg(self.red, subarray_group, 'SCHAN', s_chan, log, True)
-            # Destination IP addresses for instance i (DESTIP)
-            self.pub_gateway_msg(self.red, subarray_group, 'DESTIP', addr_list[i], log, True)
+                # Absolute starting channel for instance i (SCHAN)
+                s_chan = offset*int(hnchan) + i*n_streams_per_instance*int(hnchan)
+                self.pub_gateway_msg(self.red, chan_list[i], 'SCHAN', s_chan, log, True)
+                # Destination IP addresses for instance i (DESTIP)
+                self.pub_gateway_msg(self.red, chan_list[i], 'DESTIP', addr_list[i], log, True)
         else:
             # If key does not exist, there are no free hosts. 
             log.warning("No free resources, cannot process data from {}".format(product_id))
