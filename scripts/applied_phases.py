@@ -22,6 +22,7 @@ import logging
 import argparse
 import sys
 import json
+import ast
 
 def cli(args = sys.argv[0]):
     """CLI for antenna sensor retrieval.
@@ -89,10 +90,13 @@ def main(sensor_pattern, subarray_number, outfile):
     # Build and retrieve specified sensor data from each antenna:
     all_ant_output = []
     for ant in ant_list:
-        sensor_pattern = sensor_pattern.format(subarray_number, 'm001')
+        sensor_pattern = sensor_pattern.format(subarray_number, ant)
         ant_i_sensor = io_loop.run_sync(lambda: fetch_sensor_pattern(sensor_pattern, client, log))
         for sensor, details in ant_i_sensor.items():
             sensor_vals = details.value
+            sensor_vals = ast.literal_eval(sensor_vals)
+            # Convert complex numbers to str for json format
+            sensor_vals = list(map(str, sensor_vals))
             all_ant_output.append([sensor, sensor_vals])
         log.info('Results for {} retrieved'.format(ant))
     log.info('Saving output...')
