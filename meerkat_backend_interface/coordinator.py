@@ -385,7 +385,7 @@ class Coordinator(object):
         # Release hosts:
         for i in range(len(allocated_hosts)):
             chan_name = '{}://{}/gateway'.format(HPGDOMAIN, allocated_hosts[i])
-            self.pub_gateway_msg(self.red, chan_name, 'leave', product_id, log, True)
+            self.pub_gateway_msg(self.red, chan_name, 'leave', description, log, True)
 
         # Get list of currently available hosts:
         if(self.red.exists('coordinator:free_hosts')):
@@ -445,7 +445,6 @@ class Coordinator(object):
                 self.red.llen(array_key))
         # Build list of Hashpipe-Redis Gateway channels to publish to:
         chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
-        # Send deconfigure message to these specific hosts:
         # RA and Dec (in degrees)
         if('dec' in description):
             for i in range(len(chan_list)):
