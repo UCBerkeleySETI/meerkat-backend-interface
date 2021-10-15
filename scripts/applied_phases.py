@@ -90,8 +90,8 @@ def main(sensor_pattern, subarray_number, outfile):
     # Build and retrieve specified sensor data from each antenna:
     all_ant_output = []
     for ant in ant_list:
-        sensor_pattern = sensor_pattern.format(subarray_number, ant)
-        ant_i_sensor = io_loop.run_sync(lambda: fetch_sensor_pattern(sensor_pattern, client, log))
+        sensor_pattern_i = sensor_pattern.format(subarray_number, ant)
+        ant_i_sensor = io_loop.run_sync(lambda: fetch_sensor_pattern(sensor_pattern_i, client, log))
         for sensor, details in ant_i_sensor.items():
             sensor_vals = details.value
             sensor_vals = ast.literal_eval(sensor_vals)
@@ -101,7 +101,7 @@ def main(sensor_pattern, subarray_number, outfile):
         log.info('Results for {} retrieved'.format(ant))
     log.info('Saving output...')
     with open('{}.json'.format(outfile), 'w') as f:
-        json.dumps(all_ant_output, f)
+        json.dump(all_ant_output, f)
 
 if(__name__ == '__main__'):
     cli()
