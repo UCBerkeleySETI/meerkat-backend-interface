@@ -392,7 +392,7 @@ class Coordinator(object):
             free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
                 self.red.llen('coordinator:free_hosts'))
         else:
-            free_hosts = 0
+            free_hosts = []
         # Append released hosts and write 
         free_hosts = free_hosts + allocated_hosts
         # NOTE: in future, get rid of write_list_redis function and append or pop. 
