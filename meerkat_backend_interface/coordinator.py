@@ -443,25 +443,22 @@ class Coordinator(object):
         array_key = 'coordinator:allocated_hosts:{}'.format(msg_type)
         allocated_hosts = self.red.lrange(array_key, 0, 
                 self.red.llen(array_key))
-        # Build list of Hashpipe-Redis Gateway channels to publish to:
-        chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
+        # Hashpipe-Redis gateway group for the current subarray:
+        # NOTE: here, msg_type represents product_id.
+        subarray_group = '{}:{}///set'.format(HPGDOMAIN, msg_type)
         # RA and Dec (in degrees)
         if('dec' in description):
-            for i in range(len(chan_list)):
-                self.pub_gateway_msg(self.red, chan_list[i], 'DEC', value, log, False)
+            self.pub_gateway_msg(self.red, subarray_group, 'DEC', value, log, False)
         elif('ra' in description):
-            for i in range(len(chan_list)):
-                # pos_request_base_ra value is given in hrs (single float
-                # value)
-                ra_deg = float(value)*15.0 # Convert to degrees
-                self.pub_gateway_msg(self.red, chan_list[i], 'RA', ra_deg, log, False)
+            # pos_request_base_ra value is given in hrs (single float
+            # value)
+            ra_deg = float(value)*15.0 # Convert to degrees
+            self.pub_gateway_msg(self.red, subarray_group, 'RA', ra_deg, log, False)
         # Azimuth and elevation (in degrees):
         elif('azim' in description):
-            for i in range(len(chan_list)):
-                self.pub_gateway_msg(self.red, chan_list[i], 'AZ', value, log, False)
+            self.pub_gateway_msg(self.red, subarray_group, 'AZ', value, log, False)
         elif('elev' in description):
-            for i in range(len(chan_list)):
-                self.pub_gateway_msg(self.red, chan_list[i], 'EL', value, log, False)
+            self.pub_gateway_msg(self.red, subarray_group, 'EL', value, log, False)
 
     def get_dwell_time(self, host_key):
         """Get the current dwell time from the status buffer
