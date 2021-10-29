@@ -274,14 +274,9 @@ class Coordinator(object):
         self.pub_gateway_msg(self.red, subarray_group, 'DATADIR', datadir, 
             log, False)
         # Target information:
-        target_str, ra_str, dec_str = self.target(product_id)
+        target_str, ra, dec = self.target(product_id)
         # SRC_NAME:
         self.pub_gateway_msg(self.red, subarray_group, 'SRC_NAME', target_str, 
-            log, False)
-        # RA_STR and DEC_STR 
-        self.pub_gateway_msg(self.red, subarray_group, 'RA_STR', ra_str, 
-            log, False)
-        self.pub_gateway_msg(self.red, subarray_group, 'DEC_STR', dec_str, 
             log, False)
         # Set PKTSTART separately after all the above messages have 
         # all been delivered:
@@ -449,11 +444,15 @@ class Coordinator(object):
         # RA and Dec (in degrees)
         if('dec' in description):
             self.pub_gateway_msg(self.red, subarray_group, 'DEC', value, log, False)
+            dec_str = self.dec_sexagesimal(value)
+            self.pub_gateway_msg(self.red, subarray_group, 'DEC_STR', dec_str, log, False)
         elif('ra' in description):
             # pos_request_base_ra value is given in hrs (single float
             # value)
             ra_deg = float(value)*15.0 # Convert to degrees
             self.pub_gateway_msg(self.red, subarray_group, 'RA', ra_deg, log, False)
+            ra_str = self.ra_sexagesimal(ra_deg)
+            self.pub_gateway_msg(self.red, subarray_group, 'RA_STR', ra_str, log, False)
         # Azimuth and elevation (in degrees):
         elif('azim' in description):
             self.pub_gateway_msg(self.red, subarray_group, 'AZ', value, log, False)
@@ -1061,3 +1060,36 @@ class Coordinator(object):
             addr_list.append(prefix + '.{}+{}'.format(suffix0, 
                 n_addrs - 1 - i*streams_per_instance))
         return addr_list
+
+    def ra_sexagesimal(self, ra):
+        """Convert RA from degree form to sexagesimal form.
+           Currently displaying 3 decimal places for seconds.
+
+           Args:
+               ra (float): right ascension in degree form.
+
+           Returns:
+               ra_str (str): right ascension in sexagesimal form.
+        """
+        h = int(ra//15)
+        m = int(ra%15*4)
+        s = ra%15*4%1*60
+        ra_str = "{}:{}:{:.3f}".format(h, m, s)
+        return ra_str
+
+    def dec_sexagesimal(self, dec):
+        """Convert Dec from degree form to sexagesimal form. 
+           Currently displaying 3 decimal places for seconds. 
+           Args:
+               dec (float): declination in degree form.
+
+           Returns:
+               dec (str): declination in sexagesimal form.
+        """
+        dec = float(dec) # casting to float required
+        d = int(dec) 
+        m_d = np.abs(dec)%1*60
+        m = int(m_d)
+        s = m_d%1*60
+        dec_str = "{}:{}:{:.3f}".format(d, m, s)
+        return dec_str
