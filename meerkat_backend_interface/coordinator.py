@@ -177,7 +177,10 @@ class Coordinator(object):
                 log.warning("Insufficient resources to process full band for {}".format(product_id))
                 # Delete the key (no empty lists in Redis)
                 self.red.delete('coordinator:free_hosts')
-            else:
+            elif(len(free_hosts) == n_red_chans):
+                # Delete the key (no free hosts)
+                self.red.delete('coordinator:free_hosts')
+            elif(len(free_hosts) > n_red_chans):
                 free_hosts = free_hosts[n_red_chans:]
                 redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
             log.info('Allocated {} hosts to {}'.format(n_red_chans, product_id))
