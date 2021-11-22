@@ -7,6 +7,7 @@ import sys
 import redis
 import numpy as np
 import string
+import os
 from meerkat_backend_interface import redis_tools
 from meerkat_backend_interface.logger import log, set_logger
 
@@ -155,6 +156,9 @@ class Coordinator(object):
         product_id = description
         tracking = 0 # Initialise tracking state to 0
         log.info('New subarray built: {}'.format(product_id))
+        product_id = description
+        tracking = 0 # Initialise tracking state to 0
+        log.info('New subarray built: {}'.format(product_id))
         # Get IP address offset (if there is one) for ingesting only a specific
         # portion of the full band.
         offset = self.ip_offset(product_id)
@@ -249,16 +253,45 @@ class Coordinator(object):
     def tracking_start(self, product_id):
         """When a subarray is on source and begins tracking, and the F-engine
            data is trustworthy, this function instructs the processing nodes
-           to begin recording data.
+           to begin recording data in accordance with the current trigger mode
+           settings.
 
-           Data recording is initiated by issuing a PKTSTART value to the 
+           Before instructing the processing nodes to record, if a list of 
+           allowed sources is present, then only those sources are recorded. 
+           This list of sources is stored in Redis under the key:
+           <array name>:allowed
+
+           If the key <array name>:allowed does not exist, then recordings are
+           taken in accordance with the current trigger mode settings.
+           
+           Args:
+               product_id (str): name of current subarray. 
+        """
+        # Target information:
+        target_str, ra, dec = self.target(product_id)
+        # Check for list of allowed sources. If the list is not empty, record
+        # only if these sources are present.
+        allowed_key = '{}:allowed'.format(product_id)
+        if(self.red.exists(allowed_key)): # Only this step needed (empty lists don't exist)
+            allowed_sources = self.red.lrange(allowed_key, 0, self.red.llen(allowed_key))
+            log.info('Filter by the following source names: {}'.format(allowed_sources)) 
+            if(target_str in allowed_sources):
+                self.record_track(target_str, product_id)
+            else:
+                log.info('Target {} not in list of allowed sources, skipping...')
+        else:
+            log.info('No list of allowed sources, proceeding...')
+            self.record_track(target_str, product_id)
+
+    def record_track(self, target_str, product_id): 
+        """Data recording is initiated by issuing a PKTSTART value to the 
            processing nodes in question via the Hashpipe-Redis gateway [1].
           
            In addition, other appropriate metadata is published to the 
            processing nodes via the Hashpipe-Redis gateway. 
 
            Args:
-               
+               target_str (str): name of the current source. 
                product_id (str): name of current subarray. 
            
            [1] https://arxiv.org/pdf/1906.07391.pdf
@@ -276,11 +309,10 @@ class Coordinator(object):
         # Publish DATADIR to gateway
         self.pub_gateway_msg(self.red, subarray_group, 'DATADIR', datadir, 
             log, False)
-        # Target information:
-        target_str, ra, dec = self.target(product_id)
         # SRC_NAME:
         self.pub_gateway_msg(self.red, subarray_group, 'SRC_NAME', target_str, 
             log, False)
+     
         # Set PKTSTART separately after all the above messages have 
         # all been delivered:
         pkt_idx_start = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log)
@@ -1093,6 +1125,3 @@ class Coordinator(object):
         d = int(dec) 
         m_d = np.abs(dec)%1*60
         m = int(m_d)
-        s = m_d%1*60
-        dec_str = "{}:{}:{:.3f}".format(d, m, s)
-        return dec_str
