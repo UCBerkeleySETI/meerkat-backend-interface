@@ -76,6 +76,28 @@ def main(sensor_pattern, subarray_number, outfile):
     client = KATPortalClient(cam_url, on_update_callback=None, logger=log)
     io_loop = ioloop.IOLoop.current()
 
+    # Check last delaycal
+    delaycal_sensor = 'subarray_{}_script_last_delay_calibration'.format(subarray_number) 
+    delaycal_details = io_loop.run_sync(lambda: fetch_sensor_pattern(delaycal_sensor, client, log))
+    for sensor, details in delaycal_details.items():
+        last_delaycal = details.value 
+    log.info('Last delaycal: {}'.format(last_delaycal))
+
+    # Check last phaseup
+    phaseup_sensor = 'subarray_{}_script_last_phaseup'.format(subarray_number) 
+    phaseup_details = io_loop.run_sync(lambda: fetch_sensor_pattern(phaseup_sensor, client, log))
+    for sensor, details in phaseup_details.items():
+        last_phaseup = details.value 
+    log.info('Last phaseup: {}'.format(last_phaseup))
+
+    # Provide telstate connection information
+    telstate_sensor = 'sdp_{0}_spmc_array_{0}_wide_0_telstate_telstate'.format(subarray_number)
+    telstate_details = io_loop.run_sync(lambda: fetch_sensor_pattern(telstate_sensor, client, log))
+    if(telstate_details is not None): # Check, since this sensor disappears when not active it seems
+        for sensor, details in telstate_details.items():
+            telstate_endpoint = details.value
+        log.info('Telstate connection: {}'.format(telstate_endpoint))
+
     # Fetch list of antennas associated with current subarray:
     ant_sensor = 'cbf_{}_receptors'.format(subarray_number)
     ant_details = io_loop.run_sync(lambda: fetch_sensor_pattern(ant_sensor, client, log))
