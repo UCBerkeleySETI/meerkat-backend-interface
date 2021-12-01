@@ -21,7 +21,7 @@ import csv
 import logging
 import argparse
 import sys
-import json
+import pickle
 import ast
 
 def cli(args = sys.argv[0]):
@@ -61,7 +61,6 @@ def main(sensor_pattern, subarray_number, outfile):
     """Retrieves values for a specific sensor from each antenna in an 
        active subarray.
     """
-
     LOGGING_FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)s"
     logging.basicConfig(format=LOGGING_FORMAT)
     log = logging.getLogger('BLUSE')
@@ -118,22 +117,18 @@ def main(sensor_pattern, subarray_number, outfile):
     ant_list = ant_list.split(',') 
 
     # Build and retrieve specified sensor data from each antenna:
-    all_ant_output = []
+    all_ant_output = {}
     for ant in ant_list:
         sensor_pattern_i = sensor_pattern.format(subarray_number, ant)
         ant_i_sensor = io_loop.run_sync(lambda: fetch_sensor_pattern(sensor_pattern_i, client, log))
         for sensor, details in ant_i_sensor.items():
             sensor_vals = details.value
             sensor_vals = ast.literal_eval(sensor_vals)
-            log.info(sensor_vals)
-            log.info('\n\n\n')
-            # Convert complex numbers to str for json format
-            sensor_vals = list(map(str, sensor_vals))
-            all_ant_output.append([sensor, sensor_vals])
+            all_ant_output[ant] = {sensor:sensor_vals}
         log.info('Results for {} retrieved'.format(ant))
     log.info('Saving output...')
-    with open('{}.json'.format(outfile), 'w') as f:
-        json.dump(all_ant_output, f)
+    with open('{}.pkl'.format(outfile), 'wb') as f:
+        pickle.dump(all_ant_output, f)
 
 if(__name__ == '__main__'):
     cli()
