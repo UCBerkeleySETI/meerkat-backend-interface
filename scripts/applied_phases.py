@@ -80,15 +80,23 @@ def main(sensor_pattern, subarray_number, outfile):
     delaycal_sensor = 'subarray_{}_script_last_delay_calibration'.format(subarray_number) 
     delaycal_details = io_loop.run_sync(lambda: fetch_sensor_pattern(delaycal_sensor, client, log))
     for sensor, details in delaycal_details.items():
-        last_delaycal = details.value 
-    log.info('Last delaycal: {}'.format(last_delaycal))
+        last_delaycal = details.value
+        if(last_delaycal):
+            delaycal_ts = details.value_time 
+            log.info('Last delaycal: Schedule Block {} at {}'.format(last_delaycal, delaycal_ts))
+        else:
+            log.info('No delaycal')
 
     # Check last phaseup
     phaseup_sensor = 'subarray_{}_script_last_phaseup'.format(subarray_number) 
     phaseup_details = io_loop.run_sync(lambda: fetch_sensor_pattern(phaseup_sensor, client, log))
     for sensor, details in phaseup_details.items():
-        last_phaseup = details.value 
-    log.info('Last phaseup: {}'.format(last_phaseup))
+        last_phaseup = details.value
+        if(last_phaseup): 
+            phaseup_ts = details.value_time 
+            log.info('Last phaseup: {} at {}'.format(last_phaseup, phaseup_ts))
+        else:
+            log.info('No phaseup')
 
     # Provide telstate connection information
     telstate_sensor = 'sdp_{0}_spmc_array_{0}_wide_0_telstate_telstate'.format(subarray_number)
@@ -96,7 +104,7 @@ def main(sensor_pattern, subarray_number, outfile):
     if(telstate_details is not None): # Check, since this sensor disappears when not active it seems
         for sensor, details in telstate_details.items():
             telstate_endpoint = details.value
-        log.info('Telstate connection: {}'.format(telstate_endpoint))
+        log.info('Telstate endpoint: {}'.format(telstate_endpoint))
 
     # Fetch list of antennas associated with current subarray:
     ant_sensor = 'cbf_{}_receptors'.format(subarray_number)
@@ -117,6 +125,8 @@ def main(sensor_pattern, subarray_number, outfile):
         for sensor, details in ant_i_sensor.items():
             sensor_vals = details.value
             sensor_vals = ast.literal_eval(sensor_vals)
+            log.info(sensor_vals)
+            log.info('\n\n\n')
             # Convert complex numbers to str for json format
             sensor_vals = list(map(str, sensor_vals))
             all_ant_output.append([sensor, sensor_vals])
