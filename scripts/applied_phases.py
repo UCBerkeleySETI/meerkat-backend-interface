@@ -1,4 +1,7 @@
-"""Script to retrieve applied phase solutions from katportal. 
+"""Script to retrieve applied phase solutions from KATPortal. 
+   Note that these phase solutions are only useful if they have been 
+   applied by the primary observer (ie the F-engine outputs have been 
+   phased to boresight). 
 
    Needs to be provided with an antenna-based sensor with braces in place of 
    antenna name.
@@ -10,7 +13,9 @@
    cbf_{}_wide_antenna_channelised_voltage_{}h_eq
 
    In addition, the number of the current active subarray must be specified. 
-
+   In this way, any per-antenna sensor can be retrieved with this script.    
+ 
+   The output is saved as a serialised dictionary (using Python Pickle). 
 """
 
 from tornado import ioloop
@@ -49,6 +54,17 @@ def cli(args = sys.argv[0]):
 @coroutine
 def fetch_sensor_pattern(pattern, client, log):
     """Fetch sensor pattern for each antenna. 
+       
+       Args:
+           pattern (str): per-antenna sensor name with antenna fields
+                          replaced with braces.
+           client (obj): KATPortalClient object.
+           log: logger
+
+       Returns:
+           sensor_details (dict): sensor results including value and timestamp
+                                  of last change in value.
+           None if no sensor results obtainable. 
     """
     try:
         sensor_details = yield client.sensor_values(pattern, include_value_ts=True)
@@ -60,6 +76,15 @@ def fetch_sensor_pattern(pattern, client, log):
 def main(sensor_pattern, subarray_number, outfile):
     """Retrieves values for a specific sensor from each antenna in an 
        active subarray.
+       
+       Args:
+           pattern (str): per-antenna sensor name with antenna fields
+                          replaced with braces.
+           subarray_number (int): number of the current active subarray. 
+           outfile (str): filename for output .pkl file. 
+
+       Returns:
+           None       
     """
     LOGGING_FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)s"
     logging.basicConfig(format=LOGGING_FORMAT)
