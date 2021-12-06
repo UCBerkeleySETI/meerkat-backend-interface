@@ -127,8 +127,10 @@ def main(sensor_pattern, subarray_number, outfile):
     telstate_details = io_loop.run_sync(lambda: fetch_sensor_pattern(telstate_sensor, client, log))
     if(telstate_details is not None): # Check, since this sensor disappears when not active it seems
         for sensor, details in telstate_details.items():
-            telstate_endpoint = details.value
-        log.info('Telstate endpoint: {}'.format(telstate_endpoint))
+            telstate_endpoint = ast.literal_eval(details.value)
+        endpoint_ip = telstate_endpoint[0]
+        endpoint_port = telstate_endpoint[1] 
+        log.info('Telstate endpoint IP address: {} and port: {}'.format(endpoint_ip, endpoint_port))
 
     # Fetch list of antennas associated with current subarray:
     ant_sensor = 'cbf_{}_receptors'.format(subarray_number)
