@@ -282,6 +282,24 @@ class BLKATPortalClient(object):
                 subarray_nr, cbf_prefix, sensor) for sensor in 
                 self.stream_conf_sensors]
             self.fetch_once(stream_conf_sensors, product_id, 3, 30, 0.5)  
+        # Retrieve Telstate Redis DB endpoint information for the current 
+        # subarray. Each time a new subarray is built, a new Telstate Redis 
+        # DB is created.
+        # TODO: Consider moving this specific Telstate sensor into the 
+        # config file, or formalise in another manner. 
+        telstate_sensor = 'sdp_{0}_spmc_array_{0}_wide_0_telstate_telstate'.format(subarray_nr)
+        telstate_details = self.io_loop.run_sync(lambda: fetch_sensor_pattern(telstate_sensor, client, log))
+        if(telstate_details is not None): # Check, since this sensor disappears when not active it seems
+            for sensor, details in telstate_details.items():
+                telstate_endpoint = ast.literal_eval(details.value)
+            endpoint_ip = telstate_endpoint[0]
+            endpoint_port = telstate_endpoint[1]
+            write_pair_redis(self.redis_server, 
+                '{}:telstate_ip'.format(product_id), endpoint_ip)
+            write_pair_redis(self.redis_server, 
+                '{}:telstate_port'.format(product_id), endpoint_port)
+        else:
+            log.warning('Could not retrieve Telstate endpoint information')
         # Initialise last-target to 0
         write_pair_redis(self.redis_server, '{}:last-target'.format(product_id), 0) 
         # Indicate to anyone listening that the configure process is complete.
@@ -430,6 +448,7 @@ class BLKATPortalClient(object):
         if product_id not in self.subarray_katportals:
             log.warning("Failed to deconfigure a non-existent product_id: {}".format(product_id))
         else:
+            #NOTE: need to be sure we've unsubscribed already before removing product id
             self.subarray_katportals.pop(product_id)
             log.info("Deleted KATPortalClient instance for product_id: {}".format(product_id))
  
