@@ -298,7 +298,7 @@ class BLKATPortalClient(object):
         # TODO: Consider moving this specific Telstate sensor into the 
         # config file, or formalise in another manner. 
         telstate_sensor = 'sdp_{0}_spmc_array_{0}_wide_0_telstate_telstate'.format(subarray_nr)
-        telstate_details = self.io_loop.run_sync(lambda: fetch_sensor_pattern(telstate_sensor, client, log))
+        telstate_details = self.io_loop.run_sync(lambda: self._get_sensor_values(product_id, telstate_sensor))
         if(telstate_details is not None): # Check, since this sensor disappears when not active it seems
             for sensor, details in telstate_details.items():
                 telstate_endpoint = ast.literal_eval(details.value)
