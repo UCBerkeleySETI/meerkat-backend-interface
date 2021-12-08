@@ -117,6 +117,7 @@ class BLKATPortalClient(object):
             if key == 'msg_data':
                 sensor_name = msg['msg_data']['name']
                 sensor_value = msg['msg_data']['value']
+                sensor_timestamp = msg['msg_data']['timestamp']
                 # Write sensors (continuous update)
                 key = "{}:{}".format(product_id, sensor_name)
                 write_pair_redis(self.redis_server, key, repr(sensor_value))
@@ -160,6 +161,15 @@ class BLKATPortalClient(object):
                         str(time.time()))
                     self.save_history(self.redis_server, product_id, 'target',
                         sensor_value)
+                # If a phaseup or delaycal has been performed, save the timestamp at which 
+                # the respective script was run. This is needed so that we can obtain the 
+                # phase solutions from Telstate.  
+                elif('last_delay' in sensor_name):
+                    write_pair_redis(self.redis_server, '{}:last_delay'.format(product_id), 
+                        sensor_timestamp)
+                elif('last_phaseup' in sensor_name): 
+                    write_pair_redis(self.redis_server, '{}:last_phaseup'.format(product_id), 
+                        sensor_timestamp)
                 # Observation state for publication
                 elif('activity' in sensor_name):
                     if(sensor_value == 'track'):
@@ -448,7 +458,12 @@ class BLKATPortalClient(object):
         if product_id not in self.subarray_katportals:
             log.warning("Failed to deconfigure a non-existent product_id: {}".format(product_id))
         else:
-            #NOTE: need to be sure we've unsubscribed already before removing product id
+            # Delete certain Redis keys to avoid leaving stale values for the next subarray
+            # configuration:
+            keys_to_rm = ['{}:last_phaseup'.format(product_id), 
+                '{}:last_delaycal'.format(product_id)]
+            self.redis_server.delete(*keys_to_rm)
+            # Delete current subarray client:
             self.subarray_katportals.pop(product_id)
             log.info("Deleted KATPortalClient instance for product_id: {}".format(product_id))
  
