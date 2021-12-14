@@ -7,7 +7,6 @@ import sys
 import redis
 import numpy as np
 import string
-import os
 from meerkat_backend_interface import redis_tools
 from meerkat_backend_interface.logger import log, set_logger
 
@@ -153,9 +152,6 @@ class Coordinator(object):
                in this case is the name of the current subarray. 
         """
         # This is the identifier for the subarray that has completed configuration.
-        product_id = description
-        tracking = 0 # Initialise tracking state to 0
-        log.info('New subarray built: {}'.format(product_id))
         product_id = description
         tracking = 0 # Initialise tracking state to 0
         log.info('New subarray built: {}'.format(product_id))
@@ -432,7 +428,7 @@ class Coordinator(object):
         self.red.delete('coordinator:allocated_hosts:{}'.format(description))
         log.info("Released {} hosts; {} hosts available".format(len(allocated_hosts), 
                 len(free_hosts)))
-                    
+
     def data_suspect(self, description, value): 
         """Parse and publish data-suspect mask to the appropriate 
         processing nodes.
