@@ -28,6 +28,7 @@ import argparse
 import sys
 import pickle
 import ast
+import subprocess
 
 def cli(args = sys.argv[0]):
     """CLI for antenna sensor retrieval.
@@ -109,6 +110,7 @@ def main(sensor_pattern, subarray_number, outfile):
             delaycal_ts = details.value_time 
             log.info('Last delaycal: Schedule Block {} at {}'.format(last_delaycal, delaycal_ts))
         else:
+            delaycal_ts = None
             log.info('No delaycal')
 
     # Check last phaseup
@@ -120,6 +122,7 @@ def main(sensor_pattern, subarray_number, outfile):
             phaseup_ts = details.value_time 
             log.info('Last phaseup: {} at {}'.format(last_phaseup, phaseup_ts))
         else:
+            phaseup_ts = None
             log.info('No phaseup')
 
     # Provide telstate connection information
@@ -131,6 +134,14 @@ def main(sensor_pattern, subarray_number, outfile):
         endpoint_ip = telstate_endpoint[0]
         endpoint_port = telstate_endpoint[1] 
         log.info('Telstate endpoint IP address: {} and port: {}'.format(endpoint_ip, endpoint_port))
+        # Fetch and save phase solutions
+        script_env = '/opt/virtualenv/bluse3/bin/python3.5'
+        script_loc = '/home/danielc/bluse_telstate.py'
+        script_cmd = [script_env, 
+                      script_loc,
+                      '--telstate={}:{}'.format(endpoint_ip, endpoint_port)] 
+        log.info('Running script: {}'.format(script_cmd))
+        subprocess.Popen(script_cmd)
 
     # Fetch list of antennas associated with current subarray:
     ant_sensor = 'cbf_{}_receptors'.format(subarray_number)
