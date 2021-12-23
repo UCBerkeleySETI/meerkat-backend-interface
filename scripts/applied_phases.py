@@ -29,6 +29,11 @@ import sys
 import pickle
 import ast
 import subprocess
+import redis
+import time
+from datetime import datetime
+import numpy as np
+import os
 
 def cli(args = sys.argv[0]):
     """CLI for antenna sensor retrieval.
@@ -137,11 +142,29 @@ def main(sensor_pattern, subarray_number, outfile):
         # Fetch and save phase solutions
         script_env = '/opt/virtualenv/bluse3/bin/python3.5'
         script_loc = '/home/danielc/bluse_telstate.py'
+        # Timestamp for file name:
+        script_time = datetime.utcnow()
+        script_time = time.strftime("%Y%m%dT%H%M%S")
+        output_file = '/home/danielc/solutions_{}.npz'.format(script_time)
         script_cmd = [script_env, 
                       script_loc,
-                      '--telstate={}:{}'.format(endpoint_ip, endpoint_port)] 
+                      '--telstate={}:{}'.format(endpoint_ip, endpoint_port),
+                      '--output={}'.format(output_file)] 
         log.info('Running script: {}'.format(script_cmd))
         subprocess.Popen(script_cmd)
+
+    # Save to Redis
+    # File location:
+    solutions_file_key = 'array_{}:kgball_file:{}'.format(subarray_number, script_time)
+    redis_server.set(solutions_file_key, output_file)
+
+    # K, G, B, all
+    time.sleep(10) # Wait for script 
+    solutions_output = np.load(output_file, allow_pickle=True)
+
+    cal_keys = ['cal_K', 'cal_G', 'cal_B', 'cal_all']
+    for i in range(len(cal_keys)):
+       log.info(solutions_output['cal_K']) 
 
     # Fetch list of antennas associated with current subarray:
     ant_sensor = 'cbf_{}_receptors'.format(subarray_number)
