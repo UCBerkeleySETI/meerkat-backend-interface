@@ -298,18 +298,7 @@ class BLKATPortalClient(object):
         # TODO: Consider moving this specific Telstate sensor into the 
         # config file, or formalise in another manner. 
         telstate_sensor = 'sdp_{0}_spmc_array_{0}_wide_0_telstate_telstate'.format(subarray_nr)
-        telstate_details = self.io_loop.run_sync(lambda: self._get_sensor_values(product_id, telstate_sensor))
-        if(telstate_details is not None): # Check, since this sensor disappears when not active it seems
-            for sensor, details in telstate_details.items():
-                telstate_endpoint = ast.literal_eval(details.value)
-            endpoint_ip = telstate_endpoint[0]
-            endpoint_port = telstate_endpoint[1]
-            write_pair_redis(self.redis_server, 
-                '{}:telstate_ip'.format(product_id), endpoint_ip)
-            write_pair_redis(self.redis_server, 
-                '{}:telstate_port'.format(product_id), endpoint_port)
-        else:
-            log.warning('Could not retrieve Telstate endpoint information')
+        self.io_loop.run_sync(lambda: self._get_sensor_values(product_id, telstate_sensor))
         # Initialise last-target to 0
         write_pair_redis(self.redis_server, '{}:last-target'.format(product_id), 0) 
         log.info("All requests for once-off sensor values sent")
