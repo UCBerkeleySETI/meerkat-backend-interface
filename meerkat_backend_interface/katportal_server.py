@@ -261,7 +261,7 @@ class BLKATPortalClient(object):
         if(len(self.conf_sensors) > 0):
             conf_sensor_names = ['subarray_{}_'.format(subarray_nr) 
                 + sensor for sensor in self.conf_sensors]
-            self.fetch_once(conf_sensor_names, product_id, 3, 30, 0.5)
+            self.fetch_once(conf_sensor_names, product_id, 3, 210, 0.5)
         # Get CBF component name (in case it has changed to 
         # CBF_DEV_[product_id] instead of CBF_[product_id])
         key = '{}:subarray_{}_{}'.format(product_id, subarray_nr, 
@@ -278,7 +278,7 @@ class BLKATPortalClient(object):
             cbf_conf_sensor_names = [cbf_sensor_prefix + 
                 sensor for sensor in self.cbf_conf_sensors]
             # Get CBF sensors and write to redis.
-            self.fetch_once(cbf_conf_sensor_names, product_id, 3, 30, 0.5)
+            self.fetch_once(cbf_conf_sensor_names, product_id, 3, 210, 0.5)
             # Calculate antenna-to-Fengine mapping
             antennas, feng_ids = self.antenna_mapping(product_id, 
                 cbf_sensor_prefix)
@@ -291,7 +291,7 @@ class BLKATPortalClient(object):
             stream_conf_sensors = ['subarray_{}_streams_{}_{}'.format(
                 subarray_nr, cbf_prefix, sensor) for sensor in 
                 self.stream_conf_sensors]
-            self.fetch_once(stream_conf_sensors, product_id, 3, 30, 0.5)  
+            self.fetch_once(stream_conf_sensors, product_id, 3, 210, 0.5)  
         # Retrieve Telstate Redis DB endpoint information for the current 
         # subarray. Each time a new subarray is built, a new Telstate Redis 
         # DB is created.
@@ -312,6 +312,7 @@ class BLKATPortalClient(object):
             log.warning('Could not retrieve Telstate endpoint information')
         # Initialise last-target to 0
         write_pair_redis(self.redis_server, '{}:last-target'.format(product_id), 0) 
+        log.info("All requests for once-off sensor values sent")
         # Indicate to anyone listening that the configure process is complete.
         publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 
             'conf_complete:{}'.format(product_id))
@@ -347,7 +348,7 @@ class BLKATPortalClient(object):
         # Schedule block IDs (sched_observation_schedule_1) 
         # This is the list of schedule block IDs. The currently running block
         # will be in position 1.
-        self.fetch_once('sched_observation_schedule_1', product_id, 3, 30, 0.5)
+        self.fetch_once('sched_observation_schedule_1', product_id, 3, 210, 0.5)
         # Schedule blocks - pointing list
         retries = 3
         # Increase the timeout by this factor on subsequent retries
