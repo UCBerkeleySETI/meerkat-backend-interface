@@ -32,17 +32,12 @@ class TelstateInterface(object):
        information from MeerKAT.
     """
 
-    def __init__(self, local_redis):
+    def __init__(self):
         """Initialise the interface and logging. 
         
            Args:
                local_redis (str): Local Redis endpoint (host:port)
         """
-        l_host = local_redis.split(':')[0]
-        l_port = local_redis.split(':')[1]
-        self.redis_local = redis.StrictRedis(host=l_host, 
-                                              port=l_port, 
-                                              decode_responses=True)
         log = set_logger(log_level = logging.DEBUG)
  
     def query_telstate(self, telstate_redis, output_path):
@@ -68,13 +63,14 @@ class TelstateInterface(object):
         # Time of retrieval:
         r_time = datetime.utcnow()
         r_time = r_time.strftime("%Y%m%dT%H%M%S")
-
+ 
         # Save .npz file for diagnostic purposes.
         output_file = os.path.join(output_path, 'cal_solutions_{}'.format(r_time))
-
         log.info('Saving cal solutions to {}'.format(output_file))
         np.savez(output_file, cal_G=cal_G, cal_B=cal_B, cal_K=cal_K, 
             cal_all=corrections)
+
+        return cal_K, cal_G, cal_B, corrections, r_time
 
     def get_phaseup_corrections(self, telstate, end_time, target_average_correction,
                                 flatten_bandpass):
