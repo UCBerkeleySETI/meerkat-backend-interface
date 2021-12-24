@@ -8,6 +8,7 @@ import redis
 import numpy as np
 import string
 from meerkat_backend_interface import redis_tools
+from meerkat_backend_interface.telstate_interface import TelstateInterface
 from meerkat_backend_interface.logger import log, set_logger
 
 # Redis channels to listen to
@@ -26,6 +27,8 @@ PKTIDX_MARGIN = 1024
 SLACK_CHANNEL = 'meerkat-obs-log'
 # Redis channel to send messages to the Slack proxy
 PROXY_CHANNEL = 'slack-messages'
+# Location to save calibration files for diagnostic purposes
+DIAGNOSTIC_LOC = '/home/danielc' 
 
 class Coordinator(object):
     """This class is used to coordinate receiving and recording F-engine data
@@ -58,6 +61,7 @@ class Coordinator(object):
         self.red = redis.StrictRedis(port=redis_port, decode_responses=True)
         self.cfg_file = cfg_file
         self.triggermode = triggermode 
+        self.TelInt = TelstateInterface() # Initialise telstate interface object
         log = set_logger(log_level = logging.DEBUG)
 
     def start(self):
@@ -260,9 +264,28 @@ class Coordinator(object):
            If the key <array name>:allowed does not exist, then recordings are
            taken in accordance with the current trigger mode settings.
            
+           In addition, the current calibration solutions are retrieved from 
+           Telstate and saved both into Redis and as a .npz file. 
+
            Args:
                product_id (str): name of current subarray. 
         """
+        # Retrieve and save calibration solutions: 
+        # Retrieve and format current telstate endpoint:
+        endpoint_key = '{0}:sdp_{1}_spmc_array_{1}_wide_0_telstate_telstate'.format(product_id, product_id[-1])
+        telstate_endpoint = ast.literal_eval(self.red.get(endpoint_key))
+        telstate_endpoint = '{}:{}'.format(telstate_endpoint[0], telstate_endpoint[1])
+        # Retrieve current calibration data:
+        cal_K, cal_G, cal_B, cal_all, timestamp = self.TelInt.query_telstate(telstate_endpoint, 
+            DIAGNOSTIC_LOC)
+        # Antenna list:
+        ant_key = '{}:antennas'.format(product_id)
+        ant_list = red.lrange(ant_key, 0, red.llen(ant_key))
+        # Total number of channels:
+        nchans_total = self.red.get('{}:n_channels'.format(product_id))
+        # Save to Redis:
+        self.format_cals(product_id, cal_K, cal_G, cal_B, cal_all, len(ant_list), ant_list,
+            nchans_total, timestamp) 
         # Target information:
         target_str, ra, dec = self.target(product_id)
         # Check for list of allowed sources. If the list is not empty, record
@@ -278,6 +301,67 @@ class Coordinator(object):
         else:
             log.info('No list of allowed sources, proceeding...')
             self.record_track(target_str, product_id)
+
+    def format_cals(self, product_id, cal_K, cal_G, cal_B, cal_all, nants, ants, nchans, timestamp):
+        """Write calibration solutions into a Redis hash under the correct key. 
+           Calibration data is serialised before saving. 
+        """
+        # Serialise calibration data
+        cal_K = pickle.dumps(self.cal_array(cal_K, 'cal_K'))
+        cal_G = pickle.dumps(self.cal_array(cal_G, 'cal_G'))
+        cal_B = pickle.dumps(self.cal_array(cal_B, 'cal_B'))
+        cal_all = pickle.dumps(self.cal_array(cal_all, 'cal_all'))
+        # Save current calibration session to Redis
+        hash_key = "{}:cal_solutions:{}".format(product_id, timestamp)
+        log.info("Saving current calibration data into Redis: {}".format(hash_key))
+        hash_dict = {"cal_K":cal_K, "cal_G":cal_G, "cal_B":cal_B, "cal_all":cal_all,
+                    "nants":nants, "antenna_list":str(ants), "nchan":nchans}
+        red.hmset(hash_key, hash_dict)
+        # Save to index (zset)
+        index_name = "{}:cal_solutions:index".format(product_id)
+        log.info("Saving into Redis zset index: {}".format(index_name))
+        index_score = int(time.time())
+        red.zadd(index_name, {hash_key:index_score})
+
+    def cal_array(self, cals, cal_type):
+        """Format calibration solutions into a multidimensional array. 
+        
+        Args:
+            cals (dict): dictionary of calibration solutions as returned from
+                         Telstate.
+
+        Returns:
+            cal_mat (numpy matrix): complex float values of dimensions:
+                                    (pol, nchans, nants)
+                                    Antennas are sorted by number.
+                                    H-pol is first.  
+        """
+        log.info('Formatting {} solutions into multi-dim array'.format(cal_type))
+        # Determine number of channels:    
+        ant_keys = list(cals.keys())
+        try:
+            nchans = len(cals[ant_keys[0]])
+        except:
+            # if a single value for each antenna
+            nchans = 1
+        # Determine number of antennas:
+        nants = int(len(ant_keys)/2) # since two polarisations
+        # Ordered list of antenna number:
+        ant_n = []
+        for key in ant_keys:
+            ant_n.append(int(key[1:4]))
+        ant_n = np.unique(np.array(ant_n))
+        ant_n = np.sort(ant_n)
+        # Fill multidimensional array:
+        result_array = np.zeros((2, nchans, nants), dtype=np.complex)
+        for i in range(len(ant_n)):
+           # hpol:
+           ant_name = 'm{}h'.format(str(ant_n[i]).zfill(3))
+           result_array[0, :, i] = cals[ant_name]
+           # vpol:
+           ant_name = 'm{}v'.format(str(ant_n[i]).zfill(3))
+           result_array[1, :, i] = cals[ant_name]
+        return result_array
 
     def record_track(self, target_str, product_id): 
         """Data recording is initiated by issuing a PKTSTART value to the 
@@ -338,6 +422,9 @@ class Coordinator(object):
                 log.info('Triggermode set to \'idle\' from \'nshot\'')
         # Set subarray state to 'tracking'
         self.red.set('coordinator:tracking:{}'.format(product_id), '1')
+
+        # Run external script to retrieve phase solutions from Telstate:
+         
 
     def tracking_stop(self, product_id):
         """If the subarray stops tracking a source (more specifically, if the incoming 
