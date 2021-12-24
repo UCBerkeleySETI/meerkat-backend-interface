@@ -144,7 +144,7 @@ def main(sensor_pattern, subarray_number, outfile):
         script_loc = '/home/danielc/bluse_telstate.py'
         # Timestamp for file name:
         script_time = datetime.utcnow()
-        script_time = time.strftime("%Y%m%dT%H%M%S")
+        script_time = script_time.strftime("%Y%m%dT%H%M%S")
         output_file = '/home/danielc/solutions_{}.npz'.format(script_time)
         script_cmd = [script_env, 
                       script_loc,
