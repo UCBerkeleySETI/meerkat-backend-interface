@@ -79,6 +79,32 @@ def fetch_sensor_pattern(pattern, client, log):
         log.error(e)
         return(None)
 
+@coroutine
+def fetch_sensor_names(pattern, client, log):
+    """Fetch matching sensor names for a specified pattern. 
+       
+       Args:
+           pattern (str): pattern to match.
+           client (obj): KATPortalClient object.
+           log: logger
+
+       Returns:
+           sensor_names (dict): sensor names matching supplied pattern.
+           None if no sensor results obtainable. 
+    """
+    log.info("Checking for sensor pattern: {}".format(pattern))
+    try:
+        sensor_names = yield client.sensor_names(pattern)
+        #if not sensor_names:
+        #    log.warning("No matching sensors found for {}".format(pattern))
+        #    return(None)
+        #else:
+        log.info("Match for telstate endpoint sensor: {}".format(sensor_names))
+        #    return(sensor_names)
+    except Exception as e:
+        log.error(e)
+        return(None)
+
 def main(sensor_pattern, subarray_number, outfile):
     """Retrieves values for a specific sensor from each antenna in an 
        active subarray.
@@ -96,6 +122,7 @@ def main(sensor_pattern, subarray_number, outfile):
     logging.basicConfig(format=LOGGING_FORMAT)
     log = logging.getLogger('BLUSE')
     log.setLevel(logging.DEBUG)
+    log.info("Starting calibration solution retrieval script...")
 
     # Retrieve CAM address for current subarray:    
     subarray_name = 'array_{}'.format(subarray_number)
@@ -130,8 +157,35 @@ def main(sensor_pattern, subarray_number, outfile):
             phaseup_ts = None
             log.info('No phaseup')
 
+    # Attempting sensor name lookup:
+    # Since the full name of the telstate sensor changes based on subarray characteristics, 
+    # we attempt to look up the closest match:
+    # Note: Appears sensor lookup doesn't work with product IDs 
+    telstate_sensor_pattern = 'sdp_*.spmc_array_*_*_*_telstate.telstate'
+    telstate_details = io_loop.run_sync(lambda: fetch_sensor_names(telstate_sensor_pattern, client, log))
+    telstate_sensor_pattern = 'sdp_*.spmc_*_telstate.telstate'
+    telstate_details = io_loop.run_sync(lambda: fetch_sensor_names(telstate_sensor_pattern, client, log))
+    telstate_sensor_pattern = 'sdp_1.spmc_array_1_wide_2_telstate.telstate'
+    telstate_details = io_loop.run_sync(lambda: fetch_sensor_names(telstate_sensor_pattern, client, log))
+    telstate_sensor_pattern = 'sdp_1.spmc_array_1_*_telstate.telstate'
+    telstate_details = io_loop.run_sync(lambda: fetch_sensor_names(telstate_sensor_pattern, client, log))
+    telstate_sensor_pattern = 'sdp_*.spmc_array_1*_telstate.telstate'
+    telstate_details = io_loop.run_sync(lambda: fetch_sensor_names(telstate_sensor_pattern, client, log))
+    telstate_sensor_pattern = 'sdp_1.*_telstate.telstate'
+    telstate_details = io_loop.run_sync(lambda: fetch_sensor_names(telstate_sensor_pattern, client, log))
+
+    # Find sdp product_id:
+    sdp_id_sensor = 'sdp_{}_subarray_product_ids'.format(subarray_number)
+    sdp_id_details = io_loop.run_sync(lambda: fetch_sensor_pattern(sdp_id_sensor, client, log))
+    if(sdp_id_details is not None): # Check, since this sensor disappears when not active it seems
+        for sensor, details in sdp_id_details.items():
+            sdp_id = details.value
+
+    # Build telstate sensor name:
+    telstate_sensor = 'sdp_{}_spmc_{}_telstate_telstate'.format(subarray_number, sdp_id)
+
     # Provide telstate connection information
-    telstate_sensor = 'sdp_{0}_spmc_array_{0}_wide_0_telstate_telstate'.format(subarray_number)
+    log.info('Fetching telstate endpoint via sensor: {}'.format(telstate_sensor))
     telstate_details = io_loop.run_sync(lambda: fetch_sensor_pattern(telstate_sensor, client, log))
     if(telstate_details is not None): # Check, since this sensor disappears when not active it seems
         for sensor, details in telstate_details.items():
@@ -153,18 +207,18 @@ def main(sensor_pattern, subarray_number, outfile):
         log.info('Running script: {}'.format(script_cmd))
         subprocess.Popen(script_cmd)
 
-    # Save to Redis
-    # File location:
-    solutions_file_key = 'array_{}:kgball_file:{}'.format(subarray_number, script_time)
-    redis_server.set(solutions_file_key, output_file)
+        # Save to Redis
+        # File location:
+        solutions_file_key = 'array_{}:kgball_file:{}'.format(subarray_number, script_time)
+        redis_server.set(solutions_file_key, output_file)
 
-    # K, G, B, all
-    time.sleep(10) # Wait for script 
-    solutions_output = np.load(output_file, allow_pickle=True)
+        # K, G, B, all
+        time.sleep(10) # Wait for script 
+        solutions_output = np.load(output_file, allow_pickle=True)
 
-    cal_keys = ['cal_K', 'cal_G', 'cal_B', 'cal_all']
-    for i in range(len(cal_keys)):
-       log.info(solutions_output['cal_K']) 
+        cal_keys = ['cal_K', 'cal_G', 'cal_B', 'cal_all']
+        for i in range(len(cal_keys)):
+            log.info(solutions_output['cal_K']) 
 
     # Fetch list of antennas associated with current subarray:
     ant_sensor = 'cbf_{}_receptors'.format(subarray_number)
