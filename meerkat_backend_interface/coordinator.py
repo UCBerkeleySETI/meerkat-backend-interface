@@ -272,7 +272,7 @@ class Coordinator(object):
         """
         # Retrieve and save calibration solutions: 
         # Retrieve and format current telstate endpoint:
-        endpoint_key = '{0}:sdp_{1}_spmc_array_{1}_wide_0_telstate_telstate'.format(product_id, product_id[-1])
+        endpoint_key = self.red.get('{}:telstate_sensor'.format(product_id))
         telstate_endpoint = ast.literal_eval(self.red.get(endpoint_key))
         telstate_endpoint = '{}:{}'.format(telstate_endpoint[0], telstate_endpoint[1])
         # Retrieve current calibration data:
