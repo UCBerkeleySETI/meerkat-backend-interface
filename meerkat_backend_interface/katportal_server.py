@@ -301,21 +301,52 @@ class BLKATPortalClient(object):
         # build the sensor name manually: 
         # First, find the SDP-provided product_id:
         sdp_id_sensor = 'sdp_{}_subarray_product_ids'.format(subarray_nr)
-        sdp_id_details = io_loop.run_sync(lambda: fetch_sensor_pattern(sdp_id_sensor, client, log))
-        if(sdp_id_details is not None): 
-            for sensor, details in sdp_id_details.items():
-                sdp_id = details.value
+        # TODO: Rewrite sensor fetching functions to handle different subarray components, 
+        # replacing the sensor retrieval code here. 
+        sdp_id_details = self.io_loop.run_sync(lambda: self.fetch_sensor_pattern(sdp_id_sensor, client, log))
+        for sensor, details in sdp_id_details.items():
+            sdp_id = details.value
+        log.info(sdp_id)
         # Second, build telstate sensor name:
         telstate_sensor = 'sdp_{}_spmc_{}_telstate_telstate'.format(subarray_nr, sdp_id)
         # Save telstate sensor name to Redis
-        write_pair_redis(self.redis_server, '{}:telstate_sensor'.format(product_id), 0) 
-        self.io_loop.run_sync(lambda: self._get_sensor_values(product_id, telstate_sensor))
+        write_pair_redis(self.redis_server, '{}:telstate_sensor'.format(product_id), telstate_sensor) 
+        telstate_sensor_details = self.io_loop.run_sync(lambda: self.fetch_sensor_pattern(telstate_sensor, client, log))
+        for sensor, details in telstate_sensor_details.items():
+            telstate_endpoint = details.value
+        self.redis_server.set(telstate_sensor, telstate_endpoint)
         # Initialise last-target to 0
         write_pair_redis(self.redis_server, '{}:last-target'.format(product_id), 0) 
         log.info("All requests for once-off sensor values sent")
         # Indicate to anyone listening that the configure process is complete.
         publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 
             'conf_complete:{}'.format(product_id))
+
+    @tornado.gen.coroutine
+    def fetch_sensor_pattern(self, pattern, client, log):
+        """Fetch sensor pattern for each antenna. 
+           
+           Args:
+               pattern (str): per-antenna sensor name with antenna fields
+                              replaced with braces.
+               client (obj): KATPortalClient object.
+               log: logger
+
+           Returns:
+               sensor_details (dict): sensor results including value and timestamp
+                                      of last change in value.
+               None if no sensor results obtainable. 
+        """
+        # TODO: Merge this function with _get_sensor_values and enable the retrieval of 
+        # sensors from different subarray components. 
+        try:
+            sensor_details = yield client.sensor_values(pattern, include_value_ts=True)
+            return(sensor_details)
+        except Exception as e:
+            log.error(e)
+            return(None)
+
+
 
     def _conf_complete(self, product_id):
         """Called when sensor values for acquisition on configure have been 
