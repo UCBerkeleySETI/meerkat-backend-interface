@@ -22,7 +22,7 @@ FENG_TYPE = 'wide.antenna-channelised-voltage'
 # Hashpipe-Redis gateway domain
 HPGDOMAIN   = 'bluse'
 # Safety margin for setting index of first packet to record.
-PKTIDX_MARGIN = 1024
+PKTIDX_MARGIN = 4096
 # Slack channel to publish to:
 SLACK_CHANNEL = 'meerkat-obs-log'
 # Redis channel to send messages to the Slack proxy
