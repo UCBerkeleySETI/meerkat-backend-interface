@@ -300,13 +300,13 @@ class BLKATPortalClient(object):
         # Sensor name lookup does not appear to handle this sensor name, therefore
         # build the sensor name manually: 
         # First, find the SDP-provided product_id:
-        sdp_id_sensor = 'sdp_{}_subarray_product_ids'.format(subarray_number)
+        sdp_id_sensor = 'sdp_{}_subarray_product_ids'.format(subarray_nr)
         sdp_id_details = io_loop.run_sync(lambda: fetch_sensor_pattern(sdp_id_sensor, client, log))
         if(sdp_id_details is not None): 
             for sensor, details in sdp_id_details.items():
                 sdp_id = details.value
         # Second, build telstate sensor name:
-        telstate_sensor = 'sdp_{}_spmc_{}_telstate_telstate'.format(subarray_number, sdp_id)
+        telstate_sensor = 'sdp_{}_spmc_{}_telstate_telstate'.format(subarray_nr, sdp_id)
         # Save telstate sensor name to Redis
         write_pair_redis(self.redis_server, '{}:telstate_sensor'.format(product_id), 0) 
         self.io_loop.run_sync(lambda: self._get_sensor_values(product_id, telstate_sensor))
