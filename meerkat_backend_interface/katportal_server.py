@@ -305,8 +305,20 @@ class BLKATPortalClient(object):
         # replacing the sensor retrieval code here. 
         sdp_id_details = self.io_loop.run_sync(lambda: self.fetch_sensor_pattern(sdp_id_sensor, client, log))
         for sensor, details in sdp_id_details.items():
-            sdp_id = details.value
-        log.info(sdp_id)
+            sdp_ids = details.value
+        # Take only the first 'wide' version (not using 'narrow' mode zoom sections):
+        sdp_ids = sdp_ids.split(',')
+        log.info("SDP IDs (all): {}".format(sdp_ids))
+        sdp_wide_ids = []
+        for sdp_id in sdp_ids:
+            if('wide' in sdp_id):
+                sdp_wide_ids.append(sdp_id)
+        log.info("SDP 'wide' IDs: {}".format(sdp_wide_ids))
+        if(len(sdp_wide_ids) > 0):
+            sdp_id = sdp_wide_ids[0]
+        else:
+            sdp_id = sdp_ids[0]    
+        log.info("Using {} as SDP ID".format(sdp_id))
         # Second, build telstate sensor name:
         telstate_sensor = 'sdp_{}_spmc_{}_telstate_telstate'.format(subarray_nr, sdp_id)
         # Save telstate sensor name to Redis
