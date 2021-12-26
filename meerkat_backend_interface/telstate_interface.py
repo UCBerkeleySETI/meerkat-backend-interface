@@ -67,9 +67,12 @@ class TelstateInterface(object):
         # Save .npz file for diagnostic purposes.
         output_file = os.path.join(output_path, 'cal_solutions_{}'.format(r_time))
         log.info('Saving cal solutions to {}'.format(output_file))
-        np.savez(output_file, cal_G=cal_G, cal_B=cal_B, cal_K=cal_K, 
-            cal_all=corrections)
-
+        try:
+            np.savez(output_file, cal_G=cal_G, cal_B=cal_B, cal_K=cal_K, 
+                cal_all=corrections)
+        except Exception as e:
+            log.error(e)
+            
         return cal_K, cal_G, cal_B, corrections, r_time
 
     def get_phaseup_corrections(self, telstate, end_time, target_average_correction,
