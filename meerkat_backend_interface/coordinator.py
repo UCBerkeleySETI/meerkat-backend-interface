@@ -1,12 +1,14 @@
 import time
 from optparse import OptionParser
 import yaml
+import pickle
 import json
 import logging
 import sys
 import redis
 import numpy as np
 import string
+import ast
 from meerkat_backend_interface import redis_tools
 from meerkat_backend_interface.telstate_interface import TelstateInterface
 from meerkat_backend_interface.logger import log, set_logger
@@ -22,13 +24,13 @@ FENG_TYPE = 'wide.antenna-channelised-voltage'
 # Hashpipe-Redis gateway domain
 HPGDOMAIN   = 'bluse'
 # Safety margin for setting index of first packet to record.
-PKTIDX_MARGIN = 4096
+PKTIDX_MARGIN = 2048
 # Slack channel to publish to:
 SLACK_CHANNEL = 'meerkat-obs-log'
 # Redis channel to send messages to the Slack proxy
 PROXY_CHANNEL = 'slack-messages'
 # Location to save calibration files for diagnostic purposes
-DIAGNOSTIC_LOC = '/home/danielc' 
+DIAGNOSTIC_LOC = '/home/obs/calibration_data' 
 
 class Coordinator(object):
     """This class is used to coordinate receiving and recording F-engine data
@@ -280,7 +282,7 @@ class Coordinator(object):
             DIAGNOSTIC_LOC)
         # Antenna list:
         ant_key = '{}:antennas'.format(product_id)
-        ant_list = red.lrange(ant_key, 0, red.llen(ant_key))
+        ant_list = self.red.lrange(ant_key, 0, self.red.llen(ant_key))
         # Total number of channels:
         nchans_total = self.red.get('{}:n_channels'.format(product_id))
         # Save to Redis:
@@ -316,12 +318,12 @@ class Coordinator(object):
         log.info("Saving current calibration data into Redis: {}".format(hash_key))
         hash_dict = {"cal_K":cal_K, "cal_G":cal_G, "cal_B":cal_B, "cal_all":cal_all,
                     "nants":nants, "antenna_list":str(ants), "nchan":nchans}
-        red.hmset(hash_key, hash_dict)
+        self.red.hmset(hash_key, hash_dict)
         # Save to index (zset)
         index_name = "{}:cal_solutions:index".format(product_id)
         log.info("Saving into Redis zset index: {}".format(index_name))
         index_score = int(time.time())
-        red.zadd(index_name, {hash_key:index_score})
+        self.red.zadd(index_name, {hash_key:index_score})
 
     def cal_array(self, cals, cal_type):
         """Format calibration solutions into a multidimensional array. 
@@ -1208,3 +1210,7 @@ class Coordinator(object):
         d = int(dec) 
         m_d = np.abs(dec)%1*60
         m = int(m_d)
+        s = m_d%1*60
+        dec_str = "{}:{}:{:.3f}".format(d, m, s)
+        return dec_str
+
