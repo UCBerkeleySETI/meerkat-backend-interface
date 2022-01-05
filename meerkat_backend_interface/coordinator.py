@@ -283,6 +283,7 @@ class Coordinator(object):
         # Antenna list:
         ant_key = '{}:antennas'.format(product_id)
         ant_list = self.red.lrange(ant_key, 0, self.red.llen(ant_key))
+        ant_list = json.dumps(ant_list)
         # Total number of channels:
         nchans_total = self.red.get('{}:n_channels'.format(product_id))
         # Save to Redis:
