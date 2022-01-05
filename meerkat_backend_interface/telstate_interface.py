@@ -55,7 +55,7 @@ class TelstateInterface(object):
         # Get calibration solutions
         # Default for average gain (100.0)
         # Default for flatten bandpass (True)
-        corrections, cal_G, cal_B, cal_K = self.get_phaseup_corrections(telstate, 
+        corrections, cal_G, cal_B, cal_K, refant = self.get_phaseup_corrections(telstate, 
                                            phaseup_time,
                                            100.0,
                                            True)
@@ -69,11 +69,11 @@ class TelstateInterface(object):
         log.info('Saving cal solutions to {}'.format(output_file))
         try:
             np.savez(output_file, cal_G=cal_G, cal_B=cal_B, cal_K=cal_K, 
-                cal_all=corrections)
+                cal_all=corrections, refant=refant)
         except Exception as e:
             log.error(e)
             
-        return cal_K, cal_G, cal_B, corrections, r_time
+        return cal_K, cal_G, cal_B, corrections, r_time, refant
 
     def get_phaseup_corrections(self, telstate, end_time, target_average_correction,
                                 flatten_bandpass):
@@ -110,6 +110,12 @@ class TelstateInterface(object):
                                           .format(end_time, start_time, first_cbid))
         cbid, start_time = phaseup_cbid[0]
         view = self._telstate_capture_stream(telstate, cbid, 'cal')
+        # Retrieve reference antenna
+        try:
+            refant = view['refant']
+        except:
+            log.warning('Could not retrieve reference antenna from Telstate.')
+            refant = 'unknown' 
         _get = functools.partial(self.get_cal_solutions, view,
                                  start_time=start_time, end_time=end_time)
         # Wait for the last relevant bfcal product from the pipeline
@@ -137,7 +143,8 @@ class TelstateInterface(object):
         return self.calculate_corrections(gains, bp_gains, delays, 
                                      cal_channel_freqs,
                                      target_average_correction, 
-                                     flatten_bandpass), gains, bp_gains, delays
+                                     flatten_bandpass), gains, bp_gains, 
+                                     delays, refant
 
     def get_cal_inputs(self, view):
         """Get list of input labels associated with calibration products.

@@ -278,7 +278,7 @@ class Coordinator(object):
         telstate_endpoint = ast.literal_eval(self.red.get(endpoint_key))
         telstate_endpoint = '{}:{}'.format(telstate_endpoint[0], telstate_endpoint[1])
         # Retrieve current calibration data:
-        cal_K, cal_G, cal_B, cal_all, timestamp = self.TelInt.query_telstate(telstate_endpoint, 
+        cal_K, cal_G, cal_B, cal_all, timestamp, refant = self.TelInt.query_telstate(telstate_endpoint, 
             DIAGNOSTIC_LOC)
         # Antenna list:
         ant_key = '{}:antennas'.format(product_id)
@@ -287,7 +287,7 @@ class Coordinator(object):
         nchans_total = self.red.get('{}:n_channels'.format(product_id))
         # Save to Redis:
         self.format_cals(product_id, cal_K, cal_G, cal_B, cal_all, len(ant_list), ant_list,
-            nchans_total, timestamp) 
+            nchans_total, timestamp, refant) 
         # Target information:
         target_str, ra, dec = self.target(product_id)
         # Check for list of allowed sources. If the list is not empty, record
@@ -304,7 +304,7 @@ class Coordinator(object):
             log.info('No list of allowed sources, proceeding...')
             self.record_track(target_str, product_id)
 
-    def format_cals(self, product_id, cal_K, cal_G, cal_B, cal_all, nants, ants, nchans, timestamp):
+    def format_cals(self, product_id, cal_K, cal_G, cal_B, cal_all, nants, ants, nchans, timestamp, refant):
         """Write calibration solutions into a Redis hash under the correct key. 
            Calibration data is serialised before saving. 
         """
@@ -317,7 +317,8 @@ class Coordinator(object):
         hash_key = "{}:cal_solutions:{}".format(product_id, timestamp)
         log.info("Saving current calibration data into Redis: {}".format(hash_key))
         hash_dict = {"cal_K":cal_K, "cal_G":cal_G, "cal_B":cal_B, "cal_all":cal_all,
-                    "nants":nants, "antenna_list":str(ants), "nchan":nchans}
+                    "nants":nants, "antenna_list":str(ants), "nchan":nchans, 
+                    "refant":refant}
         self.red.hmset(hash_key, hash_dict)
         # Save to index (zset)
         index_name = "{}:cal_solutions:index".format(product_id)
