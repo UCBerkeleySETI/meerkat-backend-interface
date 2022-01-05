@@ -62,7 +62,7 @@ class TelstateInterface(object):
 
         # Time of retrieval:
         r_time = datetime.utcnow()
-        r_time = r_time.strftime("%Y%m%dT%H%M%S")
+        r_time = r_time.strftime("%Y%m%dT%H%M%SZ")
  
         # Save .npz file for diagnostic purposes.
         output_file = os.path.join(output_path, 'cal_solutions_{}'.format(r_time))
