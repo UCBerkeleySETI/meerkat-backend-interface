@@ -50,7 +50,7 @@ def check_nodes(redis_server, host_list, hpgdomain):
     print("Counting accessible hosts:")
     n_accessible = 0
     for host in host_list:
-        host_key = "{}://{}/status".format(hpgdomain, host)
+        host_key = "{}://{}/0/status".format(hpgdomain, host)
         host_status = redis_server.hgetall(host_key)
         if(len(host_status) > 0):
             n_accessible += 1
