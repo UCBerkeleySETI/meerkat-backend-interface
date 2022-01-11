@@ -663,8 +663,6 @@ class Coordinator(object):
     def select_pkt_start(self, pkt_idxs, log, idx_margin):
         """Calculates the index of the first packet from which to record
         for each processing node.
-        Employs rudimentary statistics on packet indices to determine
-        a sensible starting packet for all processing nodes.
 
         Args:
             pkt_idxs (list): List of the packet indices from each active host.
@@ -678,20 +676,11 @@ class Coordinator(object):
             data.
         """
         pkt_idxs = np.asarray(pkt_idxs, dtype = np.int64)
+        maximum = np.max(pkt_idxs)
         median = np.median(pkt_idxs)
-        margin_diff = np.abs(pkt_idxs - median)
-        # Using idx_margin as safety margin
-        margin = idx_margin
-        outliers = np.where(margin_diff > margin)[0]
-        n_outliers = len(outliers)
-        if(n_outliers > 0):
-            log.warning('{} PKTIDX value(s) exceed margin.'.format(n_outliers))
-        if(n_outliers > len(pkt_idxs)/2):
-            log.warning('Large PKTIDX spread. Check PKTSTART value.')
-        # Find largest value less than margin
-        margin_diff[outliers] = 0
-        max_idx = np.argmax(margin_diff)
-        start_pkt = pkt_idxs[max_idx] + idx_margin
+        minimum = np.min(pkt_idxs)
+        pktstart = np.max(pkt_idxs) + idx_margin
+        log.info("PKTIDX: Min {}, Median {}, Max {}, PKTSTART {}".format(minimum, median, maximum, pktstart))
         return start_pkt
 
     def host_list(self, hpgdomain, hosts):
