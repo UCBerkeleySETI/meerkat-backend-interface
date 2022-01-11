@@ -7,7 +7,7 @@ import random
 
 HPGDOMAIN   = 'bluse'
 N_NODES = 64
-N_JOIN_LEAVE = 10
+N_JOIN_LEAVE = 100
 GROUP_NAME = 'test'
 
 def join_group(redis_server, host_list, group_name):
@@ -72,7 +72,7 @@ if(__name__ == '__main__'):
         # Join test group
         join_group(redis_server, host_list, GROUP_NAME)
         # Wait random time between 0.5 and 1 second
-        time.sleep(random.uniform(0.5, 1)) 
+        time.sleep(random.uniform(0.3, 0.6)) 
         # Leave test group
         leave_group(redis_server, GROUP_NAME)
         # Results:
