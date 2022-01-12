@@ -681,7 +681,7 @@ class Coordinator(object):
         minimum = np.min(pkt_idxs)
         pktstart = np.max(pkt_idxs) + idx_margin
         log.info("PKTIDX: Min {}, Median {}, Max {}, PKTSTART {}".format(minimum, median, maximum, pktstart))
-        return start_pkt
+        return pktstart
 
     def host_list(self, hpgdomain, hosts):
         """Build a list of Hashpipe-Redis Gateway channels from a list 

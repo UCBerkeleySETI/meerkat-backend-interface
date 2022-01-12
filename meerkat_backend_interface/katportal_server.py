@@ -10,7 +10,6 @@ import yaml
 import os
 import sys
 import ast
-import json
 import numpy as np
 from datetime import datetime
 import uuid

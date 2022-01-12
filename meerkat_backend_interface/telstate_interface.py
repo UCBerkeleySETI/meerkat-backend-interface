@@ -143,8 +143,7 @@ class TelstateInterface(object):
         return self.calculate_corrections(gains, bp_gains, delays, 
                                      cal_channel_freqs,
                                      target_average_correction, 
-                                     flatten_bandpass), gains, bp_gains, 
-                                     delays, refant
+                                     flatten_bandpass), gains, bp_gains, delays, refant
 
     def get_cal_inputs(self, view):
         """Get list of input labels associated with calibration products.
