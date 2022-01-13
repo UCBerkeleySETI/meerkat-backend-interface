@@ -62,7 +62,8 @@ def check_nodes(redis_server, host_list, hpgdomain):
         if(len(host_status) > 0):
             n_accessible += 1
         else:
-            print("    {} is inaccessible".format(host))
+            print("        {} is inaccessible".format(host))
+            print(host_status)
     print("Accessible hosts: {}".format(n_accessible))
 
 def cli(args = sys.argv[0]):
@@ -97,15 +98,17 @@ def main(group):
         print("Test {} of {}".format(i+1, N_JOIN_LEAVE))
         n_listeners = join_group(redis_server, host_list, group)
         if(n_listeners < N_NODES):
-            print("    MISSING NODES: {}".format(N_NODES - n_listeners))
+            print("        MISSING NODES: {}".format(N_NODES - n_listeners))
         else:
             print("    Joined group:  {} listeners".format(n_listeners))
-        # Wait random time between 0.5 and 1 second
-        time.sleep(random.uniform(0.001, 0.15)) 
+        # Wait random time in seconds
+        sleep_time = random.uniform(0.001, 0.15)
+        print("Sleep time: {}".format(sleep_time))
+        time.sleep(sleep_time) 
         # Leave test group
         leave_group(redis_server, group)
         if(n_listeners < N_NODES):
-            print("    MISSING NODES: {}".format(N_NODES - n_listeners))
+            print("        MISSING NODES: {}".format(N_NODES - n_listeners))
         else:
             print("    Left group:    {} listeners".format(n_listeners))
         # Results:
