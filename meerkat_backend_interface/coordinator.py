@@ -475,9 +475,6 @@ class Coordinator(object):
         # Set subarray state to 'tracking'
         self.red.set('coordinator:tracking:{}'.format(product_id), '1')
 
-        # Run external script to retrieve phase solutions from Telstate:
-         
-
     def tracking_stop(self, product_id):
         """If the subarray stops tracking a source (more specifically, if the incoming 
            data is no longer to be trusted or used), the following actions are taken:
@@ -998,6 +995,14 @@ class Coordinator(object):
     def get_datadir_root(self, host_list):
         """Get the upper directory for DATADIR from the status buffers if 
            available.
+
+           Args:
+
+               host_list (list): list of host names in computing cluster.
+
+           Returnss:
+
+               upper_dir (str): upper directory for DATADIR
         """
         host_key = '{}://{}/status'.format(HPGDOMAIN, host_list[0])
         host_status = self.red.hgetall(host_key)
@@ -1099,6 +1104,14 @@ class Coordinator(object):
 
     def sync_time(self, product_id):
         """Sync time (UNIX, seconds)
+
+           Args:
+
+               product_id (str): the name of the current subarray.
+
+           Returns:
+
+               sync_time (int): the CBF sync time in seconds.             
         """
         sensor_key = self.cbf_sensor_name(product_id, 'sync_time')   
         sync_time = int(float(self.red.get(sensor_key))) # Is there a cleaner way?
@@ -1106,7 +1119,17 @@ class Coordinator(object):
 
     def samples_per_heap(self, product_id, spectra_per_heap):
         """Equivalent to HCLOCKS.
-        """
+           
+           Args:
+
+               product_id (str): the name of the current subarray.
+               spectra_per_heap (str): the number of individual spectra per heap. 
+ 
+           Returns:
+
+               adc_per_heap (int): number of ADC samples per heap. 
+       
+       """
         sensor_key = self.cbf_sensor_name(product_id,
             'antenna_channelised_voltage_n_samples_between_spectra')
         adc_per_spectra = self.red.get(sensor_key)
@@ -1115,6 +1138,14 @@ class Coordinator(object):
 
     def ip_offset(self, product_id):
         """Get IP offset (for ingesting fractions of the band)
+           
+           Args:
+
+               product_id (str): the name of the current subarray.
+
+           Returns:
+
+               offset (int): number of IP addresses to offset by. 
         """
         try:
             offset = int(self.red.get('{}:ip_offset'.format(product_id)))
@@ -1127,6 +1158,19 @@ class Coordinator(object):
 
     def ip_addresses(self, product_id, offset):
         """Acquire and apportion multicast IP groups.
+ 
+           Args:
+            
+               offset (int): number of IP addresses to offset by. 
+               product_id (str): the name of the current subarray.
+
+           Returns:
+
+               addr_list (list): list of SPEAD stream IP address groups.
+               port (int): port number.
+               n_addrs (int): number of SPEAD IP addresses. 
+               n_red_chans (int): number of Redis channels required.
+               (corresponding to the number of instances required).   
         """
         all_streams = json.loads(self.json_str_formatter(self.red.get(
             "{}:streams".format(product_id))))
@@ -1142,11 +1186,11 @@ class Coordinator(object):
         """Formatting for json.loads
         
         Args:
-            str_dict (str): str containing dict of spead streams (received 
+            str_dict (str): str containing dict of SPEAD streams (received 
             on ?configure).
         
         Returns:
-            str_dict (str): str containing dict of spead streams, formatted 
+            str_dict (str): str containing dict of SPEAD streams, formatted 
             for use with json.loads
         """
         # Is there a better way of doing this?
@@ -1155,18 +1199,18 @@ class Coordinator(object):
         return str_dict
 
     def read_spead_addresses(self, spead_addrs, n_groups, streams_per_instance, offset):
-        """Parses spead addresses given in the format: spead://<ip>+<count>:<port>
+        """Parses SPEAD addresses given in the format: spead://<ip>+<count>:<port>
         Assumes this format.
         
         Args:
-            spead_addrs (str): string containing spead IP addresses in the format 
+            spead_addrs (str): string containing SPEAD IP addresses in the format 
             above.
             n_groups (int): number of stream addresses to be sent to each 
             processing instance.
             offset (int): number of streams to skip before apportioning IPs.
         
         Returns:
-            addr_list (list): list of spead stream IP address groups.
+            addr_list (list): list of SPEAD stream IP address groups.
             port (int): port number.
         """
         addrs = spead_addrs.split('/')[-1]
