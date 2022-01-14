@@ -1,7 +1,6 @@
 import time
 from optparse import OptionParser
 import yaml
-import pickle
 import json
 import logging
 import sys
@@ -309,11 +308,11 @@ class Coordinator(object):
         """Write calibration solutions into a Redis hash under the correct key. 
            Calibration data is serialised before saving. 
         """
-        # Serialise calibration data
-        cal_K = pickle.dumps(self.cal_array(cal_K, 'cal_K'))
-        cal_G = pickle.dumps(self.cal_array(cal_G, 'cal_G'))
-        cal_B = pickle.dumps(self.cal_array(cal_B, 'cal_B'))
-        cal_all = pickle.dumps(self.cal_array(cal_all, 'cal_all'))
+        # Convert arrays into bytes (C order)
+        cal_K = self.cal_array(cal_K, 'cal_K').tobytes()
+        cal_G = self.cal_array(cal_G, 'cal_G').tobytes()
+        cal_B = self.cal_array(cal_B, 'cal_B').tobytes()
+        cal_all = self.cal_array(cal_all, 'cal_all').tobytes()
         # Save current calibration session to Redis
         hash_key = "{}:cal_solutions:{}".format(product_id, timestamp)
         log.info("Saving current calibration data into Redis: {}".format(hash_key))
