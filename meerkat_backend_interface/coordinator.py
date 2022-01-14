@@ -306,7 +306,56 @@ class Coordinator(object):
 
     def format_cals(self, product_id, cal_K, cal_G, cal_B, cal_all, nants, ants, nchans, timestamp, refant):
         """Write calibration solutions into a Redis hash under the correct key. 
-           Calibration data is serialised before saving. 
+           Calibration solution numpy arrays are saved as bytes. 
+ 
+           In addition, a Redis sorted set is used to create a convenient index. The key 
+           for each dictionary of calibration solutions is stored in the sorted set, scored by 
+           the unix time in seconds (UTC) when the particular set of calibration 
+           solutions was retrieved. 
+
+           A dictionary of calibration solutions has the following keys:
+
+               nants (list): number of antennas 
+               nchan (int): number of channels
+               antenna_list (list): names of the antennas
+               refant (str): name of the reference antenna
+               cal_G (bytes) 
+               cal_K (bytes)
+               cal_B (bytes)
+               cal_all (bytes)
+           
+           The key for each Redis hash containing the dictionary is given as follows:
+
+               <subarray_name>:cal_solutions:<retrieval timestamp>
+
+           e.g. 
+ 
+               array_3:cal_solutions:20220110T065832Z
+
+           The key for the index of each subarray is given as follows:
+
+               <subarray_name>:cal_solutions:index
+
+           e.g.
+ 
+               array_3:cal_solutions:index
+
+           Args:
+
+               product_id (str): name of the current subarray. 
+               timestamp (str): UTC retrieval timestamp.
+               refant (str): name of the reference antenna.
+               ants (list): list of antennas in the current subarray.
+               nants (int): number of antennas in the current subarray.
+               nchans (int): number of channels
+               cal_G (numpy array)
+               cal_K (numpy array)
+               cal_B (numpy array)
+               cal_all (numpy array)
+
+           Returns:
+ 
+               None
         """
         # Convert arrays into bytes (C order)
         cal_K = self.cal_array(cal_K, 'cal_K').tobytes()
