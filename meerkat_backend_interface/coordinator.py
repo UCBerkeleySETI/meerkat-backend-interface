@@ -319,10 +319,10 @@ class Coordinator(object):
                nchan (int): number of channels
                antenna_list (list): names of the antennas
                refant (str): name of the reference antenna
-               cal_G (bytes) 
-               cal_K (bytes)
-               cal_B (bytes)
-               cal_all (bytes)
+               cal_G (bytes): complex gain calibration data
+               cal_K (bytes): real fixed delay calibration data
+               cal_B (bytes): complex bandpass calibration data
+               cal_all (bytes): complex all-inclusive calibration data
            
            The key for each Redis hash containing the dictionary is given as follows:
 
@@ -347,11 +347,11 @@ class Coordinator(object):
                refant (str): name of the reference antenna.
                ants (list): list of antennas in the current subarray.
                nants (int): number of antennas in the current subarray.
-               nchans (int): number of channels
-               cal_G (numpy array)
-               cal_K (numpy array)
-               cal_B (numpy array)
-               cal_all (numpy array)
+               nchans (int): number of channels.
+               cal_G (numpy array): complex gain calibration data.
+               cal_K (numpy array): real fixed delay calibration data. 
+               cal_B (numpy array): complex bandpass calibration data.
+               cal_all (numpy array): complex all-inclusive calibration data. 
 
            Returns:
  

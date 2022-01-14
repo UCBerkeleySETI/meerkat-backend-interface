@@ -41,11 +41,21 @@ class TelstateInterface(object):
         log = set_logger(log_level = logging.DEBUG)
  
     def query_telstate(self, telstate_redis, output_path):
-        """Query the current Telstate Redis DB for the latest calibration 
-           
+        """Query the current Telstate Redis DB for the latest calibration solutions. 
+           They are also written to an .npz file temporarily for diagnostic purposes.   
+
            Args:
                telstate_redis (str): Redis endpoint for Telstate (host:port)
                output_path (str): Output file path for saving cal data. 
+
+           Returns:
+               cal_G: complex gain calibration data.
+               cal_K: real fixed delay calibration data. 
+               cal_B: complex bandpass calibration data. 
+               corrections: (also 'cal_all'): complex all-inclusive calibration data. 
+               r_time (str): retrieval time (UTC).
+               refant (str): name of the reference antenna.
+
         """
         log.info('Querying Telstate at {}'.format(telstate_redis))
         # Create TelescopeState object for current subarray:
