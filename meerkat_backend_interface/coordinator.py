@@ -202,7 +202,9 @@ class Coordinator(object):
             
             # Apply to processing nodes
             subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
-            
+
+            # Name of current subarray (SUBARRAY)
+            self.pub_gateway_msg(self.red, subarray_group, 'SUBARRAY', product_id, log, True)
             # Port (BINDPORT)
             self.pub_gateway_msg(self.red, subarray_group, 'BINDPORT', port, log, True)        
             # Total number of streams (FENSTRM)
