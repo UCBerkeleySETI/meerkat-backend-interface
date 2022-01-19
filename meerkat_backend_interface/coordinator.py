@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from optparse import OptionParser
 import yaml
 import json
@@ -30,6 +31,8 @@ SLACK_CHANNEL = 'meerkat-obs-log'
 PROXY_CHANNEL = 'slack-messages'
 # Location to save calibration files for diagnostic purposes
 DIAGNOSTIC_LOC = '/home/obs/calibration_data' 
+# Unique telescope ID:
+TELESCOPE_NAME = 'meerkat64'
 
 class Coordinator(object):
     """This class is used to coordinate receiving and recording F-engine data
@@ -207,16 +210,19 @@ class Coordinator(object):
             # Sync time (UNIX, seconds)
             t_sync = self.sync_time(product_id)
             self.pub_gateway_msg(self.red, subarray_group, 'SYNCTIME', t_sync, log, True)
+            self.red.set('{}:synctime'.format(product_id), t_sync)
             # Centre frequency (FECENTER)
             fecenter = self.centre_freq(product_id) 
             self.pub_gateway_msg(self.red, subarray_group, 'FECENTER', fecenter, log, True)
             # Total number of frequency channels (FENCHAN)    
             n_freq_chans = self.red.get('{}:n_channels'.format(product_id))
+            self.red.set('{}:fenchan'.format(product_id), n_freq_chans)
             self.pub_gateway_msg(self.red, subarray_group, 'FENCHAN', n_freq_chans, log, True)
             # Coarse channel bandwidth (from F engines)
             # Note: no sign information! 
             # (CHAN_BW)
             chan_bw = self.coarse_chan_bw(product_id, n_freq_chans)
+            self.red.set('{}:chan_bw'.format(product_id), chan_bw)
             self.pub_gateway_msg(self.red, subarray_group, 'CHAN_BW', chan_bw, log, True) 
             # Number of channels per substream (HNCHAN)
             hnchan = self.chan_per_substream(product_id)
@@ -226,6 +232,7 @@ class Coordinator(object):
             self.pub_gateway_msg(self.red, subarray_group, 'HNTIME', hntime, log, True)
             # Number of ADC samples per heap (HCLOCKS)
             adc_per_heap = self.samples_per_heap(product_id, hntime)
+            self.red.set('{}:hclocks'.format(product_id), adc_per_heap)
             self.pub_gateway_msg(self.red, subarray_group, 'HCLOCKS', adc_per_heap, log, True)
             # Number of antennas (NANTS)
             n_ants = self.antennas(product_id)
@@ -444,10 +451,27 @@ class Coordinator(object):
         # SRC_NAME:
         self.pub_gateway_msg(self.red, subarray_group, 'SRC_NAME', target_str, 
             log, False)
-     
+
+        # Calculate PKTSTART
+        pkt_idx_start = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log)
+
+        # Acquire timestamp associated with PKTSTART
+        # Seconds since SYNCTIME: PKTIDX*HCLOCKS/(2e6*FENCHAN*ABS(CHAN_BW))
+        hclocks = self.red.get('{}:hclocks'.format(product_id))
+        synctime = self.red.get('{}:synctime'.format(product_id))
+        fenchan = self.red.get('{}:fenchan'.format(product_id))
+        chan_bw = self.red.get('{}:chan_bw'.format(product_id))
+        pktstart_ts = sync_time + pkt_idx_start*hclocks/(2e6*fenchan*np.abs(chan_bw))
+        pktstart_ts = datetime.utcfromtimestamp(pktstart_ts).strftime("%Y%m%dT%H%M%SZ")
+
+        # Publish OBSID to the gateway:
+        # OBSID is a unique identifier for a particular observation. 
+        obsid = "{}:{}:{}".format(TELESCOPE_NAME, product_id, pktstart_ts)
+        self.pub_gateway_msg(self.red, subarray_group, 'OBSID', obsid,
+            log, False)
+
         # Set PKTSTART separately after all the above messages have 
         # all been delivered:
-        pkt_idx_start = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log)
         self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 
             pkt_idx_start, log, False)
         # Alert via slack:
