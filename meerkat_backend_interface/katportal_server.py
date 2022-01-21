@@ -520,7 +520,7 @@ class BLKATPortalClient(object):
         Returns:
             None
         """
-        log.warning("Unrecognized alert : {}".format(message['data']))
+        log.warning("Unrecognized alerts message")
 
     def configure_katportal(self, cfg_file):
         """Configure the katportal_server from the .yml config file.
