@@ -290,12 +290,13 @@ class Coordinator(object):
             DIAGNOSTIC_LOC)
         # Antenna list:
         ant_key = '{}:antennas'.format(product_id)
-        ant_list = self.red.lrange(ant_key, 0, self.red.llen(ant_key))
+        nants = self.red.llen(ant_key)
+        ant_list = self.red.lrange(ant_key, 0, nants)
         ant_list = json.dumps(ant_list)
         # Total number of channels:
         nchans_total = self.red.get('{}:n_channels'.format(product_id))
         # Save to Redis:
-        self.format_cals(product_id, cal_K, cal_G, cal_B, cal_all, len(ant_list), ant_list,
+        self.format_cals(product_id, cal_K, cal_G, cal_B, cal_all, nants, ant_list, 
             nchans_total, timestamp, refant) 
         # Target information:
         target_str, ra, dec = self.target(product_id)
@@ -463,7 +464,7 @@ class Coordinator(object):
         synctime = self.red.get('{}:synctime'.format(product_id))
         fenchan = self.red.get('{}:fenchan'.format(product_id))
         chan_bw = self.red.get('{}:chan_bw'.format(product_id))
-        pktstart_ts = sync_time + pkt_idx_start*hclocks/(2e6*fenchan*np.abs(chan_bw))
+        pktstart_ts = float(synctime) + pkt_idx_start*float(hclocks)/(2e6*float(fenchan)*np.abs(float(chan_bw)))
         pktstart_ts = datetime.utcfromtimestamp(pktstart_ts).strftime("%Y%m%dT%H%M%SZ")
 
         # Publish OBSID to the gateway:
