@@ -70,7 +70,7 @@ hashpipe_instances:
 - blpn63/0
 
 per_antenna_sub:         
-- dig_l_band_noise_diode
+#- dig_l_band_noise_diode
 #- dig_s_band_noise_diode
 #- dig_u_band_noise_diode
 
@@ -82,7 +82,7 @@ cbf_sub:
 - pos_request_base_ra
 - pos_request_base_dec
 - pos_request_base_elev
-#- target
+- target
 - offset_ut1
 
 cbf_on_configure:
@@ -105,5 +105,6 @@ stream_on_configure:
 array_sub:
 - observation_activity
 - script_status 
- 
+- script_last_delay_calibration
+- script_last_phaseup 
 
