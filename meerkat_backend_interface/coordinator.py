@@ -135,6 +135,9 @@ class Coordinator(object):
                 # If pointing updates are received during tracking
                 elif('pos_request_base' in description):
                     self.pointing_update(msg_type, description, value)
+                # Updates to DUT1 (ie UT1-UTC)
+                elif('offset_ut1' in description):
+                    self.offset_ut(msg_type, value)
         except KeyboardInterrupt:
             log.info("Stopping coordinator")
             sys.exit(0)
@@ -651,6 +654,20 @@ class Coordinator(object):
             self.pub_gateway_msg(self.red, subarray_group, 'AZ', value, log, False)
         elif('elev' in description):
             self.pub_gateway_msg(self.red, subarray_group, 'EL', value, log, False)
+
+    def offset_ut(self, msg_type, value):
+        """Publish UT1_UTC, the difference (in seconds) between UT1 and UTC
+        (ie, DUT1).
+
+        Args:
+           msg_type (str): currently indicates the name of the current subarray. 
+           (to change in future for consistency). 
+           value (str): the value of UT1 - UTC. 
+        """
+        # Hashpipe-Redis gateway group for the current subarray:
+        # NOTE: here, msg_type represents product_id.
+        subarray_group = '{}:{}///set'.format(HPGDOMAIN, msg_type)
+        self.pub_gateway_msg(self.red, subarray_group, 'UT1_UTC', value, log, False)
 
     def get_dwell_time(self, host_key):
         """Get the current dwell time from the status buffer
