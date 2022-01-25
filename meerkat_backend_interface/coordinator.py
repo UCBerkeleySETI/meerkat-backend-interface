@@ -114,9 +114,16 @@ class Coordinator(object):
                 # If trigger mode is changed on the fly:
                 # (Note this overwrites the default trigger_mode)
                 if((msg_type == 'coordinator') & (description == 'trigger_mode')):
-                    self.trigger_mode = value
+                    trigger_key = value.split(':', 1)[0] 
+                    trigger_value = value.split(':', 1)[1]
+                    # Update the default trigger mode:
+                    self.trigger_mode = trigger_value
                     self.red.set('coordinator:trigger_mode', value)
-                    log.info('Trigger mode set to \'{}\''.format(value))
+                    log.info('Default trigger mode (for all subarrays) set to \'{}\''.format(trigger_value))
+                    # Update the trigger mode for the specific array in question:
+                    # (this is useful during an observation)
+                    self.red.set('coordinator:trigger_mode:{}'.format(trigger_key), trigger_value)
+                    log.info('Trigger mode for {}  set to \'{}\''.format(trigger_key, trigger_value))
                 # If all the sensor values required on configure have been
                 # successfully fetched by the katportalserver
                 elif(msg_type == 'conf_complete'):
