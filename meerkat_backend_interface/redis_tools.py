@@ -14,7 +14,7 @@ class REDIS_CHANNELS:
     """
     alerts = "alerts"
     sensor_alerts = "sensor_alerts" 
-    triggermode = "coordinator:trigger_mode"
+    trigger_mode = "coordinator:trigger_mode"
 
 def write_pair_redis(server, key, value, expiration=None):
     """Writes a key-value pair to Redis.

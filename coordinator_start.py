@@ -17,27 +17,23 @@ def cli(prog = sys.argv[0]):
                       help='Redis port to connect to', default=6379)
     parser.add_option('-c', '--config', dest='cfg_file', type=str,
                       help='Config filename (yaml)', default = 'config.yml')
-    parser.add_option('-t', '--triggermode', dest='triggermode', type=str,
+    parser.add_option('-t', '--trigger_mode', dest='trigger_mode', type=str,
                       help="""Trigger mode: 
-                                  \'idle\': PKTSTART will not be sent.
-                                  \'auto\': PKTSTART will be sent each 
-                                      time a target is tracked.
-                                  \'armed\': PKTSTART will only be sent for 
-                                      the next target. Thereafter, the state 
-                                      will transition to idle.'
+                                  \'nshot:<n>\': PKTSTART will be sent 
+                                  for <n> tracked targets.  
                            """,
-                      default = 'idle')
+                      default = 'nshot:0')
     (opts, args) = parser.parse_args()
-    main(port=opts.port, cfg_file=opts.cfg_file, triggermode=opts.triggermode)
+    main(port=opts.port, cfg_file=opts.cfg_file, trigger_mode=opts.trigger_mode)
 
 def on_shutdown():
     log.info("Coordinator shutting down.")
     sys.exit()
 
-def main(port, cfg_file, triggermode):
+def main(port, cfg_file, trigger_mode):
     log = set_logger(log_level = logging.DEBUG)
     log.info("Starting Coordinator")
-    coord = Coordinator(port, cfg_file, triggermode)
+    coord = Coordinator(port, cfg_file, trigger_mode)
     signal.signal(signal.SIGINT, lambda sig, frame: on_shutdown())
     coord.start()
 

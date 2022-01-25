@@ -16,7 +16,7 @@ from meerkat_backend_interface.logger import log, set_logger
 # Redis channels to listen to
 ALERTS_CHANNEL = redis_tools.REDIS_CHANNELS.alerts
 SENSOR_CHANNEL = redis_tools.REDIS_CHANNELS.sensor_alerts
-TRIGGER_CHANNEL = redis_tools.REDIS_CHANNELS.triggermode
+TRIGGER_CHANNEL = redis_tools.REDIS_CHANNELS.trigger_mode
 # Type of stream
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'
 # F-engine mode (so far 'wide' and 'narrow' are known to be available)
@@ -48,23 +48,30 @@ class Coordinator(object):
        see appendix B in https://arxiv.org/pdf/1906.07391.pdf
     """
 
-    def __init__(self, redis_port, cfg_file, triggermode):
+    def __init__(self, redis_port, cfg_file, trigger_mode):
         """Initialise the coordinator.
 
            Args:
                redis_port (str): Redis port to listen on. 
                cfg_file (str): path to the .yml configuration file which
                (among other things) provides a list of available hosts. 
-               triggermode (str): the desired trigger mode on startup is 
-               set. Options include:
-                   \'idle\': PKTSTART will not be sent.
-                   \'auto\': PKTSTART will be sent each time a target is tracked.
-                   \'armed\': PKTSTART will only be sent for the next target. 
-                   Thereafter, the state will transition to idle.'
+               trigger_mode (str): the desired default trigger mode on startup.  
+               This is of the form:
+
+                   \'nshot:<n>\': PKTSTART will be sent for <n> tracked targets. 
+                   Thereafter, the trigger mode state will transition to nshot:0
+                   and no further recording will take place. 
+
+               Note that this default trigger mode is applied to all future subarrays 
+               (unless changed). The trigger mode for specific subarrays can be changed
+               as follows by publishing the new trigger mode to the trigger channel, 
+               for example:
+                      
+                   PUBLISH coordinator:trigger_mode coordinator:trigger_mode:<array_name>:nshot:<n>
         """
         self.red = redis.StrictRedis(port=redis_port, decode_responses=True)
         self.cfg_file = cfg_file
-        self.triggermode = triggermode 
+        self.trigger_mode = trigger_mode # This is the default trigger_mode (for all subarrays)
         self.TelInt = TelstateInterface() # Initialise telstate interface object
         log = set_logger(log_level = logging.DEBUG)
 
@@ -105,8 +112,9 @@ class Coordinator(object):
             for msg in ps.listen():
                 msg_type, description, value = self.parse_redis_msg(msg)
                 # If trigger mode is changed on the fly:
+                # (Note this overwrites the default trigger_mode)
                 if((msg_type == 'coordinator') & (description == 'trigger_mode')):
-                    self.triggermode = value
+                    self.trigger_mode = value
                     self.red.set('coordinator:trigger_mode', value)
                     log.info('Trigger mode set to \'{}\''.format(value))
                 # If all the sensor values required on configure have been
@@ -169,9 +177,9 @@ class Coordinator(object):
         # Get IP address offset (if there is one) for ingesting only a specific
         # portion of the full band.
         offset = self.ip_offset(product_id)
-        # Initialise trigger mode (idle, armed or auto)
-        self.red.set('coordinator:trigger_mode:{}'.format(description), self.triggermode)
-        log.info('Trigger mode for {} on startup: {}'.format(description, self.triggermode))
+        # Initialise trigger mode
+        self.red.set('coordinator:trigger_mode:{}'.format(description), self.trigger_mode)
+        log.info('Trigger mode for {} on configuration: {}'.format(description, self.trigger_mode))
         # Generate list of stream IP addresses and publish appropriate messages to 
         # processing nodes:
         addr_list, port, n_addrs, n_red_chans = self.ip_addresses(product_id, offset)
@@ -283,7 +291,54 @@ class Coordinator(object):
            Args:
                product_id (str): name of current subarray. 
         """
-        # Retrieve and save calibration solutions: 
+        # Read trigger mode
+        trigger_mode = self.red.get('coordinator:trigger_mode:{}'.format(product_id))
+        try:
+            nshot = trigger_mode.split(':')
+            n_remaining = int(nshot[1])
+            # Determine if recording should go ahead (if nshot > 0).        
+            if(n_remaining == 0):
+                log.info("nshot == 0, therefore not recording this track/scan.")
+        except:
+            log.error("Could not read trigger mode: {}, not recording".format(trigger_mode))
+            n_remaining = 0
+
+        # If nshot == 1, set trigger_mode to 0 after triggering one more time.
+
+        if(n_remaining > 0):
+            # Target information (required here to check list of allowed sources):
+            target_str, ra, dec = self.target(product_id)
+            # Check for list of allowed sources. If the list is not empty, record
+            # only if these sources are present.
+            # If the list is empty, proceed with recording the current track/scan.
+            allowed_key = '{}:allowed'.format(product_id)
+            if(self.red.exists(allowed_key)): # Only this step needed (empty lists don't exist)
+                allowed_sources = self.red.lrange(allowed_key, 0, self.red.llen(allowed_key))
+                log.info('Filter by the following source names: {}'.format(allowed_sources)) 
+                if(target_str in allowed_sources):
+                    self.record_track(target_str, product_id, n_remaining)
+                else:
+                    log.info('Target {} not in list of allowed sources, skipping...')
+            else:
+                log.info('No list of allowed sources, proceeding...')
+                self.record_track(target_str, product_id, n_remaining)
+
+    def record_track(self, target_str, product_id, n_remaining): 
+        """Data recording is initiated by issuing a PKTSTART value to the 
+           processing nodes in question via the Hashpipe-Redis gateway [1].
+          
+           In addition, other appropriate metadata is published to the 
+           processing nodes via the Hashpipe-Redis gateway. 
+
+           Args:
+               target_str (str): name of the current source. 
+               product_id (str): name of current subarray. 
+               n_remaining (int): number of remaining recordings to take
+               (including the current recording). 
+           
+           [1] https://arxiv.org/pdf/1906.07391.pdf
+        """
+        # Retrieve and save calibration solutions:
         # Retrieve and format current telstate endpoint:
         endpoint_key = self.red.get('{}:telstate_sensor'.format(product_id))
         telstate_endpoint = ast.literal_eval(self.red.get(endpoint_key))
@@ -301,21 +356,59 @@ class Coordinator(object):
         # Save to Redis:
         self.format_cals(product_id, cal_K, cal_G, cal_B, cal_all, nants, ant_list, 
             nchans_total, timestamp, refant) 
-        # Target information:
-        target_str, ra, dec = self.target(product_id)
-        # Check for list of allowed sources. If the list is not empty, record
-        # only if these sources are present.
-        allowed_key = '{}:allowed'.format(product_id)
-        if(self.red.exists(allowed_key)): # Only this step needed (empty lists don't exist)
-            allowed_sources = self.red.lrange(allowed_key, 0, self.red.llen(allowed_key))
-            log.info('Filter by the following source names: {}'.format(allowed_sources)) 
-            if(target_str in allowed_sources):
-                self.record_track(target_str, product_id)
-            else:
-                log.info('Target {} not in list of allowed sources, skipping...')
-        else:
-            log.info('No list of allowed sources, proceeding...')
-            self.record_track(target_str, product_id)
+
+        # Get list of allocated hosts for this subarray:
+        array_key = 'coordinator:allocated_hosts:{}'.format(product_id)
+        allocated_hosts = self.red.lrange(array_key, 0, 
+            self.red.llen(array_key))
+
+        subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
+
+        # Retrieve DATADIR from these specific hosts:
+        datadir = self.datadir(product_id, allocated_hosts)
+        
+        # Publish DATADIR to gateway
+        self.pub_gateway_msg(self.red, subarray_group, 'DATADIR', datadir, 
+            log, False)
+
+        # SRC_NAME:
+        self.pub_gateway_msg(self.red, subarray_group, 'SRC_NAME', target_str, 
+            log, False)
+
+        # Calculate PKTSTART
+        pkt_idx_start = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log)
+
+        # Acquire timestamp associated with PKTSTART (needed for OBSID)
+        # Seconds since SYNCTIME: PKTIDX*HCLOCKS/(2e6*FENCHAN*ABS(CHAN_BW))
+        hclocks = self.red.get('{}:hclocks'.format(product_id))
+        synctime = self.red.get('{}:synctime'.format(product_id))
+        fenchan = self.red.get('{}:fenchan'.format(product_id))
+        chan_bw = self.red.get('{}:chan_bw'.format(product_id))
+        pktstart_ts = float(synctime) + pkt_idx_start*float(hclocks)/(2e6*float(fenchan)*np.abs(float(chan_bw)))
+        pktstart_ts = datetime.utcfromtimestamp(pktstart_ts).strftime("%Y%m%dT%H%M%SZ")
+
+        # Publish OBSID to the gateway:
+        # OBSID is a unique identifier for a particular observation. 
+        obsid = "{}:{}:{}".format(TELESCOPE_NAME, product_id, pktstart_ts)
+        self.pub_gateway_msg(self.red, subarray_group, 'OBSID', obsid,
+            log, False)
+
+        # Set PKTSTART separately after all the above messages have 
+        # all been delivered:
+        self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 
+            pkt_idx_start, log, False)
+
+        # Alert via slack:
+        slack_message = "{}::meerkat:: New recording started for {}!".format(SLACK_CHANNEL, product_id)
+        self.red.publish(PROXY_CHANNEL, slack_message)
+
+        # Set subarray state to 'tracking':
+        self.red.set('coordinator:tracking:{}'.format(product_id), '1')
+
+        # Decrement nshot:
+        trigger_mode = 'nshot:{}'.format(n_remaining - 1)
+        self.red.set('coordinator:trigger_mode:{}'.format(product_id), trigger_mode)
+        log.info('Trigger mode: n shots remaining: {}'.format(n))
 
     def format_cals(self, product_id, cal_K, cal_G, cal_B, cal_all, nants, ants, nchans, timestamp, refant):
         """Write calibration solutions into a Redis hash under the correct key. 
@@ -428,82 +521,6 @@ class Coordinator(object):
            result_array[1, :, i] = cals[ant_name]
         return result_array
 
-    def record_track(self, target_str, product_id): 
-        """Data recording is initiated by issuing a PKTSTART value to the 
-           processing nodes in question via the Hashpipe-Redis gateway [1].
-          
-           In addition, other appropriate metadata is published to the 
-           processing nodes via the Hashpipe-Redis gateway. 
-
-           Args:
-               target_str (str): name of the current source. 
-               product_id (str): name of current subarray. 
-           
-           [1] https://arxiv.org/pdf/1906.07391.pdf
-        """
-        # Get list of allocated hosts for this subarray:
-        array_key = 'coordinator:allocated_hosts:{}'.format(product_id)
-        allocated_hosts = self.red.lrange(array_key, 0, 
-            self.red.llen(array_key))
-
-        subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
-
-        # Send messages to these specific hosts:
-        datadir = self.datadir(product_id, allocated_hosts)
-        
-        # Publish DATADIR to gateway
-        self.pub_gateway_msg(self.red, subarray_group, 'DATADIR', datadir, 
-            log, False)
-        # SRC_NAME:
-        self.pub_gateway_msg(self.red, subarray_group, 'SRC_NAME', target_str, 
-            log, False)
-
-        # Calculate PKTSTART
-        pkt_idx_start = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log)
-
-        # Acquire timestamp associated with PKTSTART
-        # Seconds since SYNCTIME: PKTIDX*HCLOCKS/(2e6*FENCHAN*ABS(CHAN_BW))
-        hclocks = self.red.get('{}:hclocks'.format(product_id))
-        synctime = self.red.get('{}:synctime'.format(product_id))
-        fenchan = self.red.get('{}:fenchan'.format(product_id))
-        chan_bw = self.red.get('{}:chan_bw'.format(product_id))
-        pktstart_ts = float(synctime) + pkt_idx_start*float(hclocks)/(2e6*float(fenchan)*np.abs(float(chan_bw)))
-        pktstart_ts = datetime.utcfromtimestamp(pktstart_ts).strftime("%Y%m%dT%H%M%SZ")
-
-        # Publish OBSID to the gateway:
-        # OBSID is a unique identifier for a particular observation. 
-        obsid = "{}:{}:{}".format(TELESCOPE_NAME, product_id, pktstart_ts)
-        self.pub_gateway_msg(self.red, subarray_group, 'OBSID', obsid,
-            log, False)
-
-        # Set PKTSTART separately after all the above messages have 
-        # all been delivered:
-        self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 
-            pkt_idx_start, log, False)
-        # Alert via slack:
-        slack_message = "{}::meerkat:: New recording started for {}!".format(SLACK_CHANNEL, product_id)
-        self.red.publish(PROXY_CHANNEL, slack_message)
-        # If armed, reset triggermode to idle after triggering 
-        # once.
-        # NOTE: need to fix triggermode retrieval? Perhaps done?
-        triggermode = self.red.get('coordinator:trigger_mode:{}'.format(product_id))
-        if(triggermode == 'armed'):
-            self.red.set('coordinator:trigger_mode:{}'.format(product_id), 'idle')
-            log.info('Triggermode set to \'idle\' from \'armed\' from {}'.format(product_id))
-        elif('nshot' in triggermode):
-            nshot = triggermode.split(':')
-            n = int(nshot[1]) - 1
-            triggermode = '{}:{}'.format(nshot[0], n)
-            # If nshot mode, decrement nshot by one and write to Redis. 
-            self.red.set('coordinator:trigger_mode:{}'.format(product_id), triggermode)
-            log.info('Triggermode: n shots remaining: {}'.format(n))
-            if(n <= 0):
-                # Set triggermode to idle. 
-                triggermode = 'idle'
-                self.red.set('coordinator:trigger_mode:{}'.format(product_id), 'idle')
-                log.info('Triggermode set to \'idle\' from \'nshot\'')
-        # Set subarray state to 'tracking'
-        self.red.set('coordinator:tracking:{}'.format(product_id), '1')
 
     def tracking_stop(self, product_id):
         """If the subarray stops tracking a source (more specifically, if the incoming 
