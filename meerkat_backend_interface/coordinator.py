@@ -346,6 +346,8 @@ class Coordinator(object):
         # Retrieve current calibration data:
         cal_K, cal_G, cal_B, cal_all, timestamp, refant = self.TelInt.query_telstate(telstate_endpoint, 
             DIAGNOSTIC_LOC)
+        # Ensure cal_K made up of real numbers (without + 0j component in array)
+        cal_K = np.real(cal_K)
         # Antenna list:
         ant_key = '{}:antennas'.format(product_id)
         nants = self.red.llen(ant_key)
