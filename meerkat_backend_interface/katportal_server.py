@@ -60,7 +60,7 @@ class BLKATPortalClient(object):
         """Our client server to the Katportal"""
         self.redis_server = redis.StrictRedis(decode_responses = True)
         self.p = self.redis_server.pubsub(ignore_subscribe_messages=True)
-        self.io_loop = io_loop = tornado.ioloop.IOLoop.current()
+        self.io_loop = tornado.ioloop.IOLoop.current()
         self.subarray_katportals = dict()  # indexed by product IDs
         self.namespaces = dict() # indexed by product IDs
         self.config_file = config_file
@@ -356,8 +356,6 @@ class BLKATPortalClient(object):
         except Exception as e:
             log.error(e)
             return(None)
-
-
 
     def _conf_complete(self, product_id):
         """Called when sensor values for acquisition on configure have been 
