@@ -1,4 +1,6 @@
 import time
+from functools import partial
+import tornado.gen
 from datetime import datetime
 from optparse import OptionParser
 import yaml
@@ -330,20 +332,15 @@ class Coordinator(object):
                 log.info('No list of allowed sources, proceeding...')
                 self.record_track(target_str, product_id, n_remaining)
 
-    def record_track(self, target_str, product_id, n_remaining): 
-        """Data recording is initiated by issuing a PKTSTART value to the 
-           processing nodes in question via the Hashpipe-Redis gateway [1].
-          
-           In addition, other appropriate metadata is published to the 
-           processing nodes via the Hashpipe-Redis gateway. 
+    def retrieve_cals(self, product_id):
+        """Retrieves calibration solutions and saves them to Redis. They are 
+        also formatted and indexed.
 
-           Args:
-               target_str (str): name of the current source. 
-               product_id (str): name of current subarray. 
-               n_remaining (int): number of remaining recordings to take
-               (including the current recording). 
-           
-           [1] https://arxiv.org/pdf/1906.07391.pdf
+        If this function is used with Tornado to run in the background (for 
+        example after a specified delay), the current IO loop is stopped. 
+
+        Args:
+            product_id (str): the name of the current subarray. 
         """
         # Retrieve and save calibration solutions:
         # Retrieve and format current telstate endpoint:
@@ -363,6 +360,37 @@ class Coordinator(object):
         # Save to Redis:
         self.format_cals(product_id, cal_K, cal_G, cal_B, cal_all, nants, ant_list, 
             nchans_total, timestamp, refant) 
+        log.info("Calibration solutions retrieved, stopping io_loop")
+        io_loop = tornado.ioloop.IOLoop.current()
+        io_loop.stop()
+
+    def record_track(self, target_str, product_id, n_remaining): 
+        """Data recording is initiated by issuing a PKTSTART value to the 
+           processing nodes in question via the Hashpipe-Redis gateway [1].
+          
+           Calibration solutions are retrieved, formatted in the background 
+           after a 60 second delay and saved to Redis. This 60 second delay 
+           is needed to ensure that the calibration solutions provided by 
+           Telstate are current. 
+
+           In addition, other appropriate metadata are published to the 
+           processing nodes via the Hashpipe-Redis gateway. 
+
+           Args:
+               target_str (str): name of the current source. 
+               product_id (str): name of current subarray. 
+               n_remaining (int): number of remaining recordings to take
+               (including the current recording). 
+           
+           [1] https://arxiv.org/pdf/1906.07391.pdf
+        """
+ 
+        # Retrieve calibration solutionsi after 60 seconds have passed (see above
+        # for explanation of this delay):
+        io_loop = tornado.ioloop.IOLoop.current()
+        io_loop.call_later(delay=60, callback=partial(self.retrieve_cals, product_id))
+        log.info("Starting io_loop to retrieve cal solutions in background")
+        io_loop.start()       
 
         # Get list of allocated hosts for this subarray:
         array_key = 'coordinator:allocated_hosts:{}'.format(product_id)
