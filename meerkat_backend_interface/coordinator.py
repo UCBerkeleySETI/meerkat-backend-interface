@@ -353,8 +353,6 @@ class Coordinator(object):
         # Retrieve current calibration data:
         cal_K, cal_G, cal_B, cal_all, timestamp, refant = self.TelInt.query_telstate(telstate_endpoint, 
             DIAGNOSTIC_LOC)
-        # Ensure cal_K made up of real numbers (without + 0j component in array)
-        cal_K = np.real(cal_K)
         # Antenna list:
         ant_key = '{}:antennas'.format(product_id)
         nants = self.red.llen(ant_key)
@@ -473,8 +471,10 @@ class Coordinator(object):
                None
         """
         # Convert arrays into bytes (C order)
-        cal_K = self.cal_array(cal_K, 'cal_K').tobytes()
         cal_G = self.cal_array(cal_G, 'cal_G').tobytes()
+        # Ensure cal_K made up of real numbers (without + 0j component in array)
+        cal_K = np.real(cal_K)
+        cal_K = self.cal_array(cal_K, 'cal_K').tobytes()
         cal_B = self.cal_array(cal_B, 'cal_B').tobytes()
         cal_all = self.cal_array(cal_all, 'cal_all').tobytes()
         # Save current calibration session to Redis
