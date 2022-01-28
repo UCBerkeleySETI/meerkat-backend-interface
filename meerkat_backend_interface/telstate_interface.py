@@ -53,7 +53,8 @@ class TelstateInterface(object):
                cal_K: real fixed delay calibration data. 
                cal_B: complex bandpass calibration data. 
                corrections: (also 'cal_all'): complex all-inclusive calibration data. 
-               r_time (str): retrieval time (UTC).
+               r_time (str): timestamp (UTC) at which last calibration script was 
+                             run (by SARAO).
                refant (str): name of the reference antenna.
 
         """
@@ -70,12 +71,12 @@ class TelstateInterface(object):
                                            100.0,
                                            True)
 
-        # Time of retrieval:
-        r_time = datetime.utcnow()
-        r_time = r_time.strftime("%Y%m%dT%H%M%SZ")
- 
+        # Format timestamp:
+        timestamp = datetime.utcfromtimestamp(phaseup_time)
+        timestamp = timestamp.strftime("%Y%m%dT%H%M%SZ")
+
         # Save .npz file for diagnostic purposes.
-        output_file = os.path.join(output_path, 'cal_solutions_{}'.format(r_time))
+        output_file = os.path.join(output_path, 'cal_solutions_{}'.format(timestamp))
         log.info('Saving cal solutions to {}'.format(output_file))
         try:
             np.savez(output_file, cal_G=cal_G, cal_B=cal_B, cal_K=cal_K, 
@@ -83,7 +84,7 @@ class TelstateInterface(object):
         except Exception as e:
             log.error(e)
             
-        return cal_K, cal_G, cal_B, corrections, r_time, refant
+        return cal_K, cal_G, cal_B, corrections, timestamp, refant
 
     def get_phaseup_corrections(self, telstate, end_time, target_average_correction,
                                 flatten_bandpass):

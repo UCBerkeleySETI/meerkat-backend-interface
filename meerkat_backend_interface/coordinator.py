@@ -342,6 +342,9 @@ class Coordinator(object):
         Args:
             product_id (str): the name of the current subarray. 
         """
+        # Retrieval time (ie right now):
+        r_time = datetime.utcnow()
+        r_time = r_time.strftime("%Y%m%dT%H%M%SZ")
         # Retrieve and save calibration solutions:
         # Retrieve and format current telstate endpoint:
         endpoint_key = self.red.get('{}:telstate_sensor'.format(product_id))
@@ -359,7 +362,7 @@ class Coordinator(object):
         nchans_total = self.red.get('{}:n_channels'.format(product_id))
         # Save to Redis:
         self.format_cals(product_id, cal_K, cal_G, cal_B, cal_all, nants, ant_list, 
-            nchans_total, timestamp, refant) 
+            nchans_total, timestamp, refant, r_time) 
         log.info("Calibration solutions retrieved, stopping io_loop")
         io_loop = tornado.ioloop.IOLoop.current()
         io_loop.stop()
@@ -445,7 +448,7 @@ class Coordinator(object):
         self.red.set('coordinator:trigger_mode:{}'.format(product_id), trigger_mode)
         log.info('Trigger mode: n shots remaining: {}'.format(n))
 
-    def format_cals(self, product_id, cal_K, cal_G, cal_B, cal_all, nants, ants, nchans, timestamp, refant):
+    def format_cals(self, product_id, cal_K, cal_G, cal_B, cal_all, nants, ants, nchans, timestamp, refant, r_t):
         """Write calibration solutions into a Redis hash under the correct key. 
            Calibration solution numpy arrays are saved as bytes. 
  
@@ -464,7 +467,11 @@ class Coordinator(object):
                cal_K (bytes): real fixed delay calibration data
                cal_B (bytes): complex bandpass calibration data
                cal_all (bytes): complex all-inclusive calibration data
-           
+               script_ts (str): UTC timestamp at which last calibration script
+                                (on SARAO side) was completed. 
+               retrieval_ts (str): UTC timestamp at which the current set of 
+                                   calibration solutions was retrieved.           
+
            The key for each Redis hash containing the dictionary is given as follows:
 
                <subarray_name>:cal_solutions:<retrieval timestamp>
@@ -484,7 +491,8 @@ class Coordinator(object):
            Args:
 
                product_id (str): name of the current subarray. 
-               timestamp (str): UTC retrieval timestamp.
+               timestamp (str): UTC time at which last phaseup script was completed.
+               r_t (str): UTC timestamp of retrieval (time when requested).
                refant (str): name of the reference antenna.
                ants (list): list of antennas in the current subarray.
                nants (int): number of antennas in the current subarray.
@@ -510,7 +518,7 @@ class Coordinator(object):
         log.info("Saving current calibration data into Redis: {}".format(hash_key))
         hash_dict = {"cal_K":cal_K, "cal_G":cal_G, "cal_B":cal_B, "cal_all":cal_all,
                     "nants":nants, "antenna_list":str(ants), "nchan":nchans, 
-                    "refant":refant}
+                    "refant":refant, "script_ts":timestamp, "retrieval_ts":r_t}
         self.red.hmset(hash_key, hash_dict)
         # Save to index (zset)
         index_name = "{}:cal_solutions:index".format(product_id)
