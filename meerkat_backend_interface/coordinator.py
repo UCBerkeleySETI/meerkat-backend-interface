@@ -181,8 +181,12 @@ class Coordinator(object):
         """
         # This is the identifier for the subarray that has completed configuration.
         product_id = description
-        tracking = 0 # Initialise tracking state to 0
         log.info('New subarray built: {}'.format(product_id))
+        tracking = 0 # Initialise tracking state to 0
+        # Initialise cal_solutions timestamp to 0 to ensure the most recent
+        # cal solutions are recorded. Note using Redis here so that the value persists
+        # even if the coordinator is restarted in the middle of an observation. 
+        self.red.set('coordinator:cal_ts:{}'.format(product_id)) = 0
         # Get IP address offset (if there is one) for ingesting only a specific
         # portion of the full band.
         offset = self.ip_offset(product_id)
@@ -342,28 +346,39 @@ class Coordinator(object):
         Args:
             product_id (str): the name of the current subarray. 
         """
-        # Retrieval time (ie right now):
-        r_time = datetime.utcnow()
-        r_time = r_time.strftime("%Y%m%dT%H%M%SZ")
-        # Retrieve and save calibration solutions:
         # Retrieve and format current telstate endpoint:
         endpoint_key = self.red.get('{}:telstate_sensor'.format(product_id))
         telstate_endpoint = ast.literal_eval(self.red.get(endpoint_key))
         telstate_endpoint = '{}:{}'.format(telstate_endpoint[0], telstate_endpoint[1])
-        # Retrieve current calibration data:
-        cal_K, cal_G, cal_B, cal_all, timestamp, refant = self.TelInt.query_telstate(telstate_endpoint, 
-            DIAGNOSTIC_LOC)
-        # Antenna list:
-        ant_key = '{}:antennas'.format(product_id)
-        nants = self.red.llen(ant_key)
-        ant_list = self.red.lrange(ant_key, 0, nants)
-        ant_list = json.dumps(ant_list)
-        # Total number of channels:
-        nchans_total = self.red.get('{}:n_channels'.format(product_id))
-        # Save to Redis:
-        self.format_cals(product_id, cal_K, cal_G, cal_B, cal_all, nants, ant_list, 
-            nchans_total, timestamp, refant, r_time) 
-        log.info("Calibration solutions retrieved, stopping io_loop")
+        # Before requesting solutions, check if they are newer than the most 
+        # recent set that was retrieved. Note that a set is always requested if
+        # this is the first recording for a particular subarray configuration.
+        # Retrieve last timestamp:
+        last_cal_ts = red.get('coordinator:cal_ts:{}'.format(product_id)) 
+        # Retrieve current timestamp:
+        current_cal_ts = self.TelInt.get_phaseup_time(telstate_endpoint)
+        # Compare:
+        if(last_cal_ts < current_cal_ts): 
+            # Retrieval time (ie right now):
+            r_time = datetime.utcnow()
+            r_time = r_time.strftime("%Y%m%dT%H%M%SZ")
+            # Retrieve and save calibration solutions:
+            # Retrieve current calibration data:
+            cal_K, cal_G, cal_B, cal_all, timestamp, refant = self.TelInt.query_telstate(telstate_endpoint, 
+                DIAGNOSTIC_LOC)
+            # Antenna list:
+            ant_key = '{}:antennas'.format(product_id)
+            nants = self.red.llen(ant_key)
+            ant_list = self.red.lrange(ant_key, 0, nants)
+            ant_list = json.dumps(ant_list)
+            # Total number of channels:
+            nchans_total = self.red.get('{}:n_channels'.format(product_id))
+            # Save to Redis:
+            self.format_cals(product_id, cal_K, cal_G, cal_B, cal_all, nants, ant_list, 
+                nchans_total, timestamp, refant, r_time) 
+            log.info("New calibration solutions retrieved, stopping io_loop")
+        else:
+            log.info("No calibration solution updates, stopping io_loop")
         io_loop = tornado.ioloop.IOLoop.current()
         io_loop.stop()
 
@@ -388,7 +403,7 @@ class Coordinator(object):
            [1] https://arxiv.org/pdf/1906.07391.pdf
         """
  
-        # Retrieve calibration solutionsi after 60 seconds have passed (see above
+        # Retrieve calibration solutions after 60 seconds have passed (see above
         # for explanation of this delay):
         io_loop = tornado.ioloop.IOLoop.current()
         io_loop.call_later(delay=60, callback=partial(self.retrieve_cals, product_id))
