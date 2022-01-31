@@ -359,23 +359,8 @@ class Coordinator(object):
         current_cal_ts = self.TelInt.get_phaseup_time(telstate_endpoint)
         # Compare:
         if(last_cal_ts < current_cal_ts): 
-            # Retrieval time (ie right now):
-            r_time = datetime.utcnow()
-            r_time = r_time.strftime("%Y%m%dT%H%M%SZ")
             # Retrieve and save calibration solutions:
-            # Retrieve current calibration data:
-            cal_K, cal_G, cal_B, cal_all, timestamp, refant = self.TelInt.query_telstate(telstate_endpoint, 
-                DIAGNOSTIC_LOC)
-            # Antenna list:
-            ant_key = '{}:antennas'.format(product_id)
-            nants = self.red.llen(ant_key)
-            ant_list = self.red.lrange(ant_key, 0, nants)
-            ant_list = json.dumps(ant_list)
-            # Total number of channels:
-            nchans_total = self.red.get('{}:n_channels'.format(product_id))
-            # Save to Redis:
-            self.format_cals(product_id, cal_K, cal_G, cal_B, cal_all, nants, ant_list, 
-                nchans_total, timestamp, refant, r_time) 
+            self.TelInt.query_telstate(telstate_endpoint, DIAGNOSTIC_LOC, product_id)
             log.info("New calibration solutions retrieved, stopping io_loop")
         else:
             log.info("No calibration solution updates, stopping io_loop")
@@ -462,129 +447,6 @@ class Coordinator(object):
         trigger_mode = 'nshot:{}'.format(n_remaining - 1)
         self.red.set('coordinator:trigger_mode:{}'.format(product_id), trigger_mode)
         log.info('Trigger mode: n shots remaining: {}'.format(n))
-
-    def format_cals(self, product_id, cal_K, cal_G, cal_B, cal_all, nants, ants, nchans, timestamp, refant, r_t):
-        """Write calibration solutions into a Redis hash under the correct key. 
-           Calibration solution numpy arrays are saved as bytes. 
- 
-           In addition, a Redis sorted set is used to create a convenient index. The key 
-           for each dictionary of calibration solutions is stored in the sorted set, scored by 
-           the unix time in seconds (UTC) when the particular set of calibration 
-           solutions was retrieved. 
-
-           A dictionary of calibration solutions has the following keys:
-
-               nants (list): number of antennas 
-               nchan (int): number of channels
-               antenna_list (list): names of the antennas
-               refant (str): name of the reference antenna
-               cal_G (bytes): complex gain calibration data
-               cal_K (bytes): real fixed delay calibration data
-               cal_B (bytes): complex bandpass calibration data
-               cal_all (bytes): complex all-inclusive calibration data
-               script_ts (str): UTC timestamp at which last calibration script
-                                (on SARAO side) was completed. 
-               retrieval_ts (str): UTC timestamp at which the current set of 
-                                   calibration solutions was retrieved.           
-
-           The key for each Redis hash containing the dictionary is given as follows:
-
-               <subarray_name>:cal_solutions:<retrieval timestamp>
-
-           e.g. 
- 
-               array_3:cal_solutions:20220110T065832Z
-
-           The key for the index of each subarray is given as follows:
-
-               <subarray_name>:cal_solutions:index
-
-           e.g.
- 
-               array_3:cal_solutions:index
-
-           Args:
-
-               product_id (str): name of the current subarray. 
-               timestamp (str): UTC time at which last phaseup script was completed.
-               r_t (str): UTC timestamp of retrieval (time when requested).
-               refant (str): name of the reference antenna.
-               ants (list): list of antennas in the current subarray.
-               nants (int): number of antennas in the current subarray.
-               nchans (int): number of channels.
-               cal_G (numpy array): complex gain calibration data.
-               cal_K (numpy array): real fixed delay calibration data. 
-               cal_B (numpy array): complex bandpass calibration data.
-               cal_all (numpy array): complex all-inclusive calibration data. 
-
-           Returns:
- 
-               None
-        """
-        # Convert arrays into bytes (C order)
-        cal_G = self.cal_array(cal_G, 'cal_G').tobytes()
-        # Ensure cal_K made up of real numbers (without + 0j component in array)
-        cal_K = self.cal_array(cal_K, 'cal_K').tobytes()
-        cal_B = self.cal_array(cal_B, 'cal_B').tobytes()
-        cal_all = self.cal_array(cal_all, 'cal_all').tobytes()
-        # Save current calibration session to Redis
-        hash_key = "{}:cal_solutions:{}".format(product_id, timestamp)
-        log.info("Saving current calibration data into Redis: {}".format(hash_key))
-        hash_dict = {"cal_K":cal_K, "cal_G":cal_G, "cal_B":cal_B, "cal_all":cal_all,
-                    "nants":nants, "antenna_list":str(ants), "nchan":nchans, 
-                    "refant":refant, "script_ts":timestamp, "retrieval_ts":r_t}
-        self.red.hmset(hash_key, hash_dict)
-        # Save to index (zset)
-        index_name = "{}:cal_solutions:index".format(product_id)
-        log.info("Saving into Redis zset index: {}".format(index_name))
-        index_score = int(time.time())
-        self.red.zadd(index_name, {hash_key:index_score})
-
-    def cal_array(self, cals, cal_type):
-        """Format calibration solutions into a multidimensional array. 
-        
-        Args:
-            cals (dict): dictionary of calibration solutions as returned from
-                         Telstate.
-            cal_type (str): calibration type (cal_K, cal_G, etc).
-
-        Returns:
-            cal_mat (numpy matrix): complex float values of dimensions:
-                                    (pol, nchans, nants)
-                                    Antennas are sorted by number.
-                                    H-pol is first.  
-        """
-        log.info('Formatting {} solutions into multi-dim array'.format(cal_type))
-        # Determine number of channels:    
-        ant_keys = list(cals.keys())
-        try:
-            nchans = len(cals[ant_keys[0]])
-        except:
-            # if a single value for each antenna
-            nchans = 1
-        # Determine number of antennas:
-        nants = int(len(ant_keys)/2) # since two polarisations
-        # Ordered list of antenna number:
-        ant_n = []
-        for key in ant_keys:
-            ant_n.append(int(key[1:4]))
-        ant_n = np.unique(np.array(ant_n))
-        ant_n = np.sort(ant_n)
-        # Fill multidimensional array:
-        # Detect if data is complex:
-        if(np.iscomplexobj(cals['m{}h'.format(ant_n[i])])):
-            result_array = np.zeros((2, nchans, nants), dtype=np.complex)
-        else:
-            result_array = np.zeros((2, nchans, nant))
-        for i in range(len(ant_n)):
-           # hpol:
-           ant_name = 'm{}h'.format(str(ant_n[i]).zfill(3))
-           result_array[0, :, i] = cals[ant_name]
-           # vpol:
-           ant_name = 'm{}v'.format(str(ant_n[i]).zfill(3))
-           result_array[1, :, i] = cals[ant_name]
-        return result_array
-
 
     def tracking_stop(self, product_id):
         """If the subarray stops tracking a source (more specifically, if the incoming 
