@@ -186,7 +186,7 @@ class Coordinator(object):
         # Initialise cal_solutions timestamp to 0 to ensure the most recent
         # cal solutions are recorded. Note using Redis here so that the value persists
         # even if the coordinator is restarted in the middle of an observation. 
-        self.red.set('coordinator:cal_ts:{}'.format(product_id)) = 0
+        self.red.set('coordinator:cal_ts:{}'.format(product_id), 0)
         # Get IP address offset (if there is one) for ingesting only a specific
         # portion of the full band.
         offset = self.ip_offset(product_id)
