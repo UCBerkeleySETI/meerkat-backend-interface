@@ -354,7 +354,7 @@ class Coordinator(object):
         # recent set that was retrieved. Note that a set is always requested if
         # this is the first recording for a particular subarray configuration.
         # Retrieve last timestamp:
-        last_cal_ts = red.get('coordinator:cal_ts:{}'.format(product_id)) 
+        last_cal_ts = self.red.get('coordinator:cal_ts:{}'.format(product_id)) 
         # Retrieve current timestamp:
         current_cal_ts = self.TelInt.get_phaseup_time(telstate_endpoint)
         # Compare:
