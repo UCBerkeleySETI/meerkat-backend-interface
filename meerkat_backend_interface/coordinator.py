@@ -74,7 +74,6 @@ class Coordinator(object):
         self.red = redis.StrictRedis(port=redis_port, decode_responses=True)
         self.cfg_file = cfg_file
         self.trigger_mode = trigger_mode # This is the default trigger_mode (for all subarrays)
-        self.TelInt = TelstateInterface() # Initialise telstate interface object
         log = set_logger(log_level = logging.DEBUG)
 
     def start(self):
@@ -316,8 +315,6 @@ class Coordinator(object):
             log.error("Could not read trigger mode: {}, not recording".format(trigger_mode))
             n_remaining = 0
 
-        # If nshot == 1, set trigger_mode to 0 after triggering one more time.
-
         if(n_remaining > 0):
             # Target information (required here to check list of allowed sources):
             target_str, ra, dec = self.target(product_id)
@@ -350,17 +347,18 @@ class Coordinator(object):
         endpoint_key = self.red.get('{}:telstate_sensor'.format(product_id))
         telstate_endpoint = ast.literal_eval(self.red.get(endpoint_key))
         telstate_endpoint = '{}:{}'.format(telstate_endpoint[0], telstate_endpoint[1])
+        self.TelInt = TelstateInterface(telstate_endpoint) # Initialise telstate interface object
         # Before requesting solutions, check if they are newer than the most 
         # recent set that was retrieved. Note that a set is always requested if
         # this is the first recording for a particular subarray configuration.
         # Retrieve last timestamp:
-        last_cal_ts = self.red.get('coordinator:cal_ts:{}'.format(product_id)) 
+        last_cal_ts = float(self.red.get('coordinator:cal_ts:{}'.format(product_id))) 
         # Retrieve current timestamp:
-        current_cal_ts = self.TelInt.get_phaseup_time(telstate_endpoint)
+        current_cal_ts = self.TelInt.get_phaseup_time()
         # Compare:
         if(last_cal_ts < current_cal_ts): 
             # Retrieve and save calibration solutions:
-            self.TelInt.query_telstate(telstate_endpoint, DIAGNOSTIC_LOC, product_id)
+            self.TelInt.query_telstate(DIAGNOSTIC_LOC, product_id)
             log.info("New calibration solutions retrieved, stopping io_loop")
         else:
             log.info("No calibration solution updates, stopping io_loop")
@@ -446,7 +444,7 @@ class Coordinator(object):
         # Decrement nshot:
         trigger_mode = 'nshot:{}'.format(n_remaining - 1)
         self.red.set('coordinator:trigger_mode:{}'.format(product_id), trigger_mode)
-        log.info('Trigger mode: n shots remaining: {}'.format(n))
+        log.info('Trigger mode: n shots remaining: {}'.format(n_remaining - 1))
 
     def tracking_stop(self, product_id):
         """If the subarray stops tracking a source (more specifically, if the incoming 

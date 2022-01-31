@@ -22,6 +22,7 @@ import time
 import functools
 import pathlib
 from datetime import datetime
+import json
 
 import katsdptelstate
 
@@ -32,36 +33,36 @@ class TelstateInterface(object):
        information from MeerKAT.
     """
 
-    def __init__(self):
+    def __init__(self, telstate_redis):
         """Initialise the interface and logging. 
         
            Args:
                local_redis (str): Local Redis endpoint (host:port)
+               telstate_redis (str): Redis endpoint for Telstate (host:port)
         """
         log = set_logger(log_level = logging.DEBUG)
-        self.red = redis.StrictRedis() # Default port and address
+        self.red = redis.StrictRedis(decode_responses=True) # Default port and address
+        # Create TelescopeState object for current subarray:
+        self.telstate = katsdptelstate.TelescopeState(telstate_redis)
  
-    def query_telstate(self, telstate_redis, output_path, product_id):
+    def query_telstate(self, output_path, product_id):
         """Query the current Telstate Redis DB for the latest calibration solutions. 
            They are also written to an .npz file temporarily for diagnostic purposes.   
 
            Args:
-               telstate_redis (str): Redis endpoint for Telstate (host:port)
                output_path (str): Output file path for saving cal data. 
                product_id (str): name of current subarray.
 
            Returns:
                None
         """
-        log.info('Querying Telstate at {}'.format(telstate_redis))
-        # Create TelescopeState object for current subarray:
-        telstate = katsdptelstate.TelescopeState(telstate_redis)
+        log.info('Querying Telstate for {}'.format(product_id))
         # Query most recent phaseup time from Telstate:
-        phaseup_time = self.get_phaseup_time(telstate)
+        phaseup_time = self.get_phaseup_time()
         # Get calibration solutions
         # Default for average gain (100.0)
         # Default for flatten bandpass (True)
-        corrections, cal_G, cal_B, cal_K, refant = self.get_phaseup_corrections(telstate, 
+        corrections, cal_G, cal_B, cal_K, refant = self.get_phaseup_corrections(self.telstate, 
                                            phaseup_time,
                                            100.0,
                                            True)
@@ -93,7 +94,7 @@ class TelstateInterface(object):
         nchans_total = self.red.get('{}:n_channels'.format(product_id))
         
         # Format calibration solutions, save to Redis and index: 
-        self.format_cals(product_id, cal_K, cal_G, cal_B, cal_all, nants, ant_list,
+        self.format_cals(product_id, cal_K, cal_G, cal_B, corrections, nants, ant_list,
                 nchans_total, timestamp, refant, r_time)
 
     def cal_array(self, cals, cal_type):
@@ -128,10 +129,10 @@ class TelstateInterface(object):
         ant_n = np.sort(ant_n)
         # Fill multidimensional array:
         # Detect if data is complex:
-        if(np.iscomplexobj(cals['m{}h'.format(ant_n[i])])):
+        if(np.iscomplexobj(cals['m{}h'.format(str(ant_n[0]).zfill(3))])):
             result_array = np.zeros((2, nchans, nants), dtype=np.complex)
         else:
-            result_array = np.zeros((2, nchans, nant))
+            result_array = np.zeros((2, nchans, nants))
         for i in range(len(ant_n)):
            # hpol:
            ant_name = 'm{}h'.format(str(ant_n[i]).zfill(3))
@@ -139,7 +140,6 @@ class TelstateInterface(object):
            # vpol:
            ant_name = 'm{}v'.format(str(ant_n[i]).zfill(3))
            result_array[1, :, i] = cals[ant_name]
-        log.info(result_array[:, 0:2, 0:2])
         return result_array
 
     def format_cals(self, product_id, cal_K, cal_G, cal_B, cal_all, nants, ants, nchans, timestamp, refant, r_t):
@@ -514,14 +514,14 @@ class TelstateInterface(object):
                 gain_corrections[inp] *= relative_gain / safe_relative_gain
         return gain_corrections
 
-    def get_phaseup_time(self, telstate):
+    def get_phaseup_time(self):
         """Timestamp of last successful phaseup (or 0 if none found).
            From fbfuse_telstate.py and bluse_telstate.py 
         """
         end_time = 0.
-        cbids = list(zip(*telstate.get_range('sdp_capture_block_id', st=0)))[0]
+        cbids = list(zip(*self.telstate.get_range('sdp_capture_block_id', st=0)))[0]
         for cbid in cbids:
-            view = telstate.view(cbid, exclusive=True)
+            view = self.telstate.view(cbid, exclusive=True)
             if 'obs_params' not in view:
                 print(f"no obs_params for {cbid}")
                 continue
