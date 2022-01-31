@@ -524,7 +524,6 @@ class Coordinator(object):
         # Convert arrays into bytes (C order)
         cal_G = self.cal_array(cal_G, 'cal_G').tobytes()
         # Ensure cal_K made up of real numbers (without + 0j component in array)
-        cal_K = np.real(cal_K)
         cal_K = self.cal_array(cal_K, 'cal_K').tobytes()
         cal_B = self.cal_array(cal_B, 'cal_B').tobytes()
         cal_all = self.cal_array(cal_all, 'cal_all').tobytes()
@@ -547,6 +546,7 @@ class Coordinator(object):
         Args:
             cals (dict): dictionary of calibration solutions as returned from
                          Telstate.
+            cal_type (str): calibration type (cal_K, cal_G, etc).
 
         Returns:
             cal_mat (numpy matrix): complex float values of dimensions:
@@ -571,7 +571,11 @@ class Coordinator(object):
         ant_n = np.unique(np.array(ant_n))
         ant_n = np.sort(ant_n)
         # Fill multidimensional array:
-        result_array = np.zeros((2, nchans, nants), dtype=np.complex)
+        # Detect if data is complex:
+        if(np.iscomplexobj(cals['m{}h'.format(ant_n[i])])):
+            result_array = np.zeros((2, nchans, nants), dtype=np.complex)
+        else:
+            result_array = np.zeros((2, nchans, nant))
         for i in range(len(ant_n)):
            # hpol:
            ant_name = 'm{}h'.format(str(ant_n[i]).zfill(3))
