@@ -1,5 +1,6 @@
 import time
 from datetime import datetime
+import threading
 import yaml
 import json
 import logging
@@ -356,11 +357,9 @@ class Coordinator(object):
         if(last_cal_ts < current_cal_ts): 
             # Retrieve and save calibration solutions:
             self.TelInt.query_telstate(DIAGNOSTIC_LOC, product_id)
-            log.info("New calibration solutions retrieved, stopping io_loop")
+            log.info("New calibration solutions retrieved.")
         else:
-            log.info("No calibration solution updates, stopping io_loop")
-        io_loop = tornado.ioloop.IOLoop.current()
-        io_loop.stop()
+            log.info("No calibration solution updates.")
 
     def record_track(self, target_str, product_id, n_remaining): 
         """Data recording is initiated by issuing a PKTSTART value to the 
@@ -385,10 +384,9 @@ class Coordinator(object):
  
         # Retrieve calibration solutions after 60 seconds have passed (see above
         # for explanation of this delay):
-        io_loop = tornado.ioloop.IOLoop.current()
-        io_loop.call_later(60, lambda:self.retrieve_cals(product_id))
-        log.info("Starting io_loop to retrieve cal solutions in background")
-        io_loop.start()       
+        delay = threading.Timer(60, lambda:self.retrieve_cals(product_id))
+        log.info("Starting delay to retrieve cal solutions in background")
+        delay.start()
 
         # Get list of allocated hosts for this subarray:
         array_key = 'coordinator:allocated_hosts:{}'.format(product_id)
