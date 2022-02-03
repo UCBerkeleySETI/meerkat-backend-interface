@@ -1,8 +1,5 @@
 import time
-from functools import partial
-import tornado.gen
 from datetime import datetime
-from optparse import OptionParser
 import yaml
 import json
 import logging
@@ -389,7 +386,7 @@ class Coordinator(object):
         # Retrieve calibration solutions after 60 seconds have passed (see above
         # for explanation of this delay):
         io_loop = tornado.ioloop.IOLoop.current()
-        io_loop.call_later(delay=60, callback=partial(self.retrieve_cals, product_id))
+        io_loop.call_later(60, lambda:self.retrieve_cals(product_id))
         log.info("Starting io_loop to retrieve cal solutions in background")
         io_loop.start()       
 
