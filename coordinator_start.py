@@ -13,8 +13,8 @@ def cli(prog = sys.argv[0]):
     """
     usage = "usage: %prog [options]"
     parser = OptionParser(usage=usage)
-    parser.add_option('-p', '--port', dest='port', type=int,
-                      help='Redis port to connect to', default=6379)
+    parser.add_option('-e', '--endpoint', dest='port', type=int,
+                      help='Redis endpoint to connect to (host:port)', default=127.0.0.1:6379)
     parser.add_option('-c', '--config', dest='cfg_file', type=str,
                       help='Config filename (yaml)', default = 'config.yml')
     parser.add_option('-t', '--trigger_mode', dest='trigger_mode', type=str,

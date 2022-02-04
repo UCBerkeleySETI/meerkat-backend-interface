@@ -48,11 +48,11 @@ class Coordinator(object):
        see appendix B in https://arxiv.org/pdf/1906.07391.pdf
     """
 
-    def __init__(self, redis_port, cfg_file, trigger_mode):
+    def __init__(self, redis_endpoint, cfg_file, trigger_mode):
         """Initialise the coordinator.
 
            Args:
-               redis_port (str): Redis port to listen on. 
+               redis_endpoint (str): of the format <host>:<port> 
                cfg_file (str): path to the .yml configuration file which
                (among other things) provides a list of available hosts. 
                trigger_mode (str): the desired default trigger mode on startup.  
@@ -69,7 +69,10 @@ class Coordinator(object):
                       
                    PUBLISH coordinator:trigger_mode coordinator:trigger_mode:<array_name>:nshot:<n>
         """
-        self.red = redis.StrictRedis(port=redis_port, decode_responses=True)
+        self.redis_endpoint = redis_endpoint
+        redis_host = redis_endpoint.split(':')[0]
+        redis_port = redis_endpoint.split(':')[1]
+        self.red = redis.StrictRedis(host=redis_host, redis_port, decode_responses=True)
         self.cfg_file = cfg_file
         self.trigger_mode = trigger_mode # This is the default trigger_mode (for all subarrays)
         log = set_logger(log_level = logging.DEBUG)
@@ -345,7 +348,8 @@ class Coordinator(object):
         endpoint_key = self.red.get('{}:telstate_sensor'.format(product_id))
         telstate_endpoint = ast.literal_eval(self.red.get(endpoint_key))
         telstate_endpoint = '{}:{}'.format(telstate_endpoint[0], telstate_endpoint[1])
-        self.TelInt = TelstateInterface(telstate_endpoint) # Initialise telstate interface object
+        # Initialise telstate interface object
+        self.TelInt = TelstateInterface(self.redis_endpoint, telstate_endpoint) 
         # Before requesting solutions, check if they are newer than the most 
         # recent set that was retrieved. Note that a set is always requested if
         # this is the first recording for a particular subarray configuration.

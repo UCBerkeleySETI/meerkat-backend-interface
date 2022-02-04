@@ -33,15 +33,18 @@ class TelstateInterface(object):
        information from MeerKAT.
     """
 
-    def __init__(self, telstate_redis):
+    def __init__(self, local_redis, telstate_redis):
         """Initialise the interface and logging. 
         
            Args:
-               local_redis (str): Local Redis endpoint (host:port)
+               local_redis (str): Local Redis endpoint of the form <host>:<port>
                telstate_redis (str): Redis endpoint for Telstate (host:port)
         """
         log = set_logger(log_level = logging.DEBUG)
-        self.red = redis.StrictRedis(decode_responses=True) # Default port and address
+        local_redis_host = local_redis.split(':')[0]
+        local_redis_port = local_redis.split(':')[1]
+        self.red = redis.StrictRedis(host=local_redis_host, 
+            port=local_redis_port, decode_responses=True) 
         # Create TelescopeState object for current subarray:
         self.telstate = katsdptelstate.TelescopeState(telstate_redis)
  
