@@ -7,9 +7,12 @@ import logging
 import signal
 import sys
 import tornado
+import time
 
 from meerkat_backend_interface.katcp_server import BLBackendInterface
 from meerkat_backend_interface.logger import set_logger
+
+RETRY_DELAY = 30
 
 def cli(prog=sys.argv[0]):
     usage = "{} [options]".format(prog)
@@ -60,7 +63,16 @@ def main(ip, port, debug):
     log = set_logger(log_level=log_level)
     log.info("Starting BLBackendInterface instance")
     ioloop = tornado.ioloop.IOLoop.current()
-    server = BLBackendInterface(ip, port)
+
+    while(True):
+        try:
+            server = BLBackendInterface(ip, port)
+            break
+        except:
+            log.info("Could not start server. Retrying in {} seconds.".format(RETRY_DELAY))    
+            time.sleep(RETRY_DELAY)
+            continue
+
     signal.signal(signal.SIGINT,
                   lambda sig, frame: ioloop.add_callback_from_signal(
                       on_shutdown, ioloop, server, log))
