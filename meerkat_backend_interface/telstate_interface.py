@@ -110,7 +110,7 @@ class TelstateInterface(object):
 
         Returns:
             cal_mat (numpy matrix): complex float values of dimensions:
-                                    (pol, nchans, nants)
+                                    (nchans, npol, nants)
                                     Antennas are sorted by number.
                                     H-pol is first.  
         """
@@ -133,16 +133,16 @@ class TelstateInterface(object):
         # Fill multidimensional array:
         # Detect if data is complex:
         if(np.iscomplexobj(cals['m{}h'.format(str(ant_n[0]).zfill(3))])):
-            result_array = np.zeros((2, nchans, nants), dtype=np.complex)
+            result_array = np.zeros((nchans, 2, nants), dtype=np.complex)
         else:
-            result_array = np.zeros((2, nchans, nants))
+            result_array = np.zeros((nchans, 2, nants))
         for i in range(len(ant_n)):
            # hpol:
            ant_name = 'm{}h'.format(str(ant_n[i]).zfill(3))
-           result_array[0, :, i] = cals[ant_name]
+           result_array[:, 0, i] = cals[ant_name]
            # vpol:
            ant_name = 'm{}v'.format(str(ant_n[i]).zfill(3))
-           result_array[1, :, i] = cals[ant_name]
+           result_array[:, 1, i] = cals[ant_name]
         return result_array
 
     def format_cals(self, product_id, cal_K, cal_G, cal_B, cal_all, nants, ants, nchans, timestamp, refant, r_t):
