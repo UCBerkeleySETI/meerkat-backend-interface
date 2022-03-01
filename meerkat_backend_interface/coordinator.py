@@ -72,7 +72,7 @@ class Coordinator(object):
         self.redis_endpoint = redis_endpoint
         redis_host = redis_endpoint.split(':')[0]
         redis_port = redis_endpoint.split(':')[1]
-        self.red = redis.StrictRedis(host=redis_host, redis_port, decode_responses=True)
+        self.red = redis.StrictRedis(host=redis_host, port=redis_port, decode_responses=True)
         self.cfg_file = cfg_file
         self.trigger_mode = trigger_mode # This is the default trigger_mode (for all subarrays)
         log = set_logger(log_level = logging.DEBUG)
