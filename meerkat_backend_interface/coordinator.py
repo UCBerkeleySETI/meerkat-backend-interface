@@ -362,6 +362,7 @@ class Coordinator(object):
             # Retrieve and save calibration solutions:
             self.TelInt.query_telstate(DIAGNOSTIC_LOC, product_id)
             log.info("New calibration solutions retrieved.")
+            self.red.set('coordinator:cal_ts:{}'.format(product_id), current_cal_ts)
         else:
             log.info("No calibration solution updates.")
 
