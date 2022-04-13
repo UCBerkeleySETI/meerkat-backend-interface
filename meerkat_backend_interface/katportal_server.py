@@ -64,10 +64,6 @@ class BLKATPortalClient(object):
         self.subarray_katportals = dict()  # indexed by product IDs
         self.namespaces = dict() # indexed by product IDs
         self.config_file = config_file
-        # sensors to be retrieved once when a new subarray is configured:
-        self.once_off_sensors = []  
-        # sensors for continuous update
-        self.subscription_sensors = []  
         self.cbf_name = 'cbf_1' # Default CBF short name
 
     def MSG_TO_FUNCTION(self, msg_type):
@@ -188,7 +184,7 @@ class BLKATPortalClient(object):
                     if(sensor_value != 'busy'):
                        self.unsubscribe_list(product_id)
 
-    def check_component_name(self, component, pool_resources):
+    def check_component_name(self, sensors, component, pool_resources):
         """Check and if necessary amend component names for sensors. On
            occasion, component names are replaced temporarily (for example, 
            `cbf_1` becomes `cbf_dev_1`). The only method of  ensuring that 
@@ -199,8 +195,32 @@ class BLKATPortalClient(object):
         if(component_name != component):
             log.info('Component {} replaced with: {}'.format(component, 
                                                              component_name)) 
-            self.on_config = [sensor.replace(component, component_name) for sensor in self.on_config]
-            self.subscription = [sensor.replace(component, component_name) for sensor in self.on_config]
+            sensors = [sensor.replace(component, component_name) for sensor in sensors]
+        return sensors
+
+    def component_name(self, short_name, pool_resources):
+        """Determine the full name of a subarray component. 
+        This is most needed in the case of "dev" components - 
+        for example, cbf_dev_2 instead of cbf_2.
+        Returns the first match.
+
+        Args:
+            short_name (str): Short name of component (eg 'cbf').
+            pool_resources (str): List of components (str) in current 
+            subarray.
+            log: Logger.
+
+        Returns:
+            full_name (str): Full name of component.
+        """
+        full_name = None
+        for component in pool_resources:
+            log.info(component)
+            if short_name in component:
+                full_name = component
+        if full_name is None:
+            log.warning('Could not find component: {}'.format(short_name))
+        return full_name 
 
     def construct_sensor_lists(self, cfg_file, subarray_nr):
         """Construct sensor list for once-off retrieval
@@ -218,17 +238,32 @@ class BLKATPortalClient(object):
         except IOError:
             log.error('Config file not found')
         # Standard component-wide sensors
-        self.on_config = [sensor.format(subarray_nr) for sensor in on_config]
-        self.subscription = [sensor.format(subarray_nr) for sensor in subscription]
+        on_config = [sensor.format(subarray_nr) for sensor in on_config]
+        subscription = [sensor.format(subarray_nr) for sensor in subscription]
         # Retrieve pool resources to determine if the component names differ
         # from those expected. We have to assume that the `subarray` component
-        # is correctly named as there is no other way of retrieving it.  
-        pool_resources_sensor = 'subarray_{}_pool_resources'.format(subarray_nr)
+        # is correctly named as there is no other way of retrieving it. 
+        product_id = 'array_{}'.format(subarray_nr) 
+        pool_resources_sensor = 'subarray_{0}:subarray_{0}_pool_resources'.format(subarray_nr)
         pool_resources = self.retrieval_retry(pool_resources_sensor, product_id, 3, 210, 0.5)
-        # Check if the CBF component name differs from the standard format
-        # (for example, if the `cbf_dev_<n>` component is used). 
-        cbf_component_name = self.check_component_name('cbf', pool_resources, log) 
-        sdp_component_name = self.check_component_name('sdp', pool_resources, log) 
+        pool_resources = pool_resources.split(',')
+        # Check if component names differ from the standard format
+        # (for example, if the `cbf_dev_<n>` component is used instead of
+        # `cbf_<n>`). 
+        on_config = self.check_component_name(on_config, 
+                                              'cbf_{}'.format(subarray_nr), 
+                                              pool_resources) 
+        on_config = self.check_component_name(on_config, 
+                                              'sdp_{}'.format(subarray_nr),
+                                              pool_resources) 
+        subscription = self.check_component_name(subscription, 
+                                              'cbf_{}'.format(subarray_nr), 
+                                              pool_resources) 
+        subscription = self.check_component_name(subscription, 
+                                              'sdp_{}'.format(subarray_nr), 
+                                              pool_resources) 
+        return on_config, subscription
+
 
     @tornado.gen.coroutine
     def retrieve_sensor_details(self, array_id, sensor):
@@ -244,7 +279,7 @@ class BLKATPortalClient(object):
             sensor_dict (dictionary): 
         """
         sensor_dict = dict()
-        if not sensors:
+        if not sensor:
             log.warning("Sensor list empty. No sensors retrieved.")
         else:
             client = self.subarray_katportals[array_id]
@@ -256,10 +291,10 @@ class BLKATPortalClient(object):
                 sensor_details = yield client.sensor_values(sensor_name, 
                     component, include_value_ts=True)
                 for sensor, details in sensor_details.items():
-                    sensor_dict['timestamp'] = sensor_value.sample_time
-                    sensor_dict['value_timestamp'] = sensor_value.value_time
-                    sensor_dict['value'] = sensor_value.value
-                    sensor_dict['status'] = sensor_value.status
+                    sensor_dict['timestamp'] = details.sample_time
+                    sensor_dict['value_timestamp'] = details.value_time
+                    sensor_dict['value'] = details.value
+                    sensor_dict['status'] = details.status
             except Exception as e:
                 log.error(e)
         return sensor_dict
@@ -287,6 +322,7 @@ class BLKATPortalClient(object):
             try:
                 sensor_details = self.io_loop.run_sync(lambda: self.retrieve_sensor_details(array_id, sensor), 
                     timeout = sync_timeout + int(sync_timeout*timeout_factor*i))
+                log.info(sensor_details)
                 if(sensor_details['status'] == 'nominal'):
                     redis_key = "{}:{}".format(array_id, sensor)
                     write_pair_redis(self.redis_server, redis_key,
@@ -341,14 +377,10 @@ class BLKATPortalClient(object):
         log.info("Created katportalclient object for : {}".format(product_id))
         subarray_nr = product_id[-1]
         # Update sensor lists:
-        try:
-            (once_off_sensors, subscription_sensors) = self.construct_sensor_lists(
-                os.path.join(os.getcwd(), self.config_file), subarray_nr)
-            self.once_off_sensors = once_off_sensors
-            self.subscription_sensors = subscription_sensors     
-            log.info('Sensor lists updated')
-        except:
-            log.warning('Sensor lists not updated; old lists might be present.')
+        log.info(os.path.join(os.getcwd(), self.config_file))
+        (once_off_sensors, subscription_sensors) = self.construct_sensor_lists(
+            os.path.join(os.getcwd(), self.config_file), subarray_nr)
+        log.info('Sensor lists updated')
         ant_key = '{}:antennas'.format(product_id) 
         ant_list = self.redis_server.lrange(ant_key, 0, 
             self.redis_server.llen(ant_key))
@@ -357,7 +389,7 @@ class BLKATPortalClient(object):
         self.save_history(self.redis_server, product_id, 'antennas', 
             ant_history)
         # Get sensors on configure
-        self.retrieve_sensors(self.once_off_sensors, product_id)
+        self.retrieve_sensors(once_off_sensors, product_id)
         # Calculate antenna-to-Fengine mapping
         antennas, feng_ids = self.antenna_mapping(product_id, 
             'cbf_{}_wide_input_labelling'.format(subarray_nr))
@@ -403,9 +435,55 @@ class BLKATPortalClient(object):
         # Initialise last-target to 0
         write_pair_redis(self.redis_server, '{}:last-target'.format(product_id), 0) 
         log.info("All requests for once-off sensor values sent")
+        # Subscribe to sensors for subscription:
+        if(len(sensors_for_update) > 0):
+            loop = tornado.ioloop.IOLoop.current()
+            loop.add_callback(lambda: self.subscribe_list(product_id, 
+                subscription))
+            loop.start()
         # Indicate to anyone listening that the configure process is complete.
         publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, 
             'conf_complete:{}'.format(product_id))
+
+    @tornado.gen.coroutine
+    def unsubscribe_list(self, product_id):
+        """Unsubscribe from all sensor websocket subscriptions for 
+        the subarray designated by product_id.
+
+        Args: 
+            product_id (str): Name of the current subarray.
+
+        Returns:
+            None
+        """
+        yield self.subarray_katportals[product_id].unsubscribe(
+            namespace = self.namespaces[product_id])
+        yield self.subarray_katportals[product_id].disconnect()
+        # Stop io_loop
+        self.io_loop.stop()
+        log.info('Unsubscribed from sensors.')   
+
+    @tornado.gen.coroutine
+    def subscribe_list(self, product_id, sensor_list):
+        """Subscribes to each sensor listed for asynchronous updates.
+        
+        Args:
+            sensor_list (list): Full names of sensors to subscribe to.
+            product_id (str): The product ID given in the ?configure request.
+
+        Returns:
+            None
+        """
+        self.namespaces[product_id] = '{}_{}'.format(product_id, 
+            str(uuid.uuid4()))
+        yield self.subarray_katportals[product_id].connect()
+        result = yield self.subarray_katportals[product_id].subscribe(
+            namespace = self.namespaces[product_id]) 
+        for sensor in sensor_list:
+            # Using product_id to retrieve unique namespace
+            result = yield self.subarray_katportals[product_id].set_sampling_strategies(
+                self.namespaces[product_id], sensor, 'event')
+        log.info('Subscribed to {} sensors'.format(len(sensor_list)))
 
     def antenna_mapping(self, product_id, labelling_sensor):
         """Get the mapping from antenna to F-engine ID as given in 
@@ -520,29 +598,29 @@ class BLKATPortalClient(object):
         # Save capture-start time:
         write_pair_redis(self.redis_server, '{}:last-capture-start'.format(product_id), 
             str(time.time())) 
-        # Once-off sensors to query on ?capture_done
-        # Uncomment below to add sensors for query.
-        # sensors_to_query = [] 
-        # self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)
-        sensors_for_update = self.build_sub_sensors(product_id)
-        # Test the speed of retrieval for target information from an 
-        # individual antenna:
-        # Retrieve list of antennas:
-        ant_key = '{}:antennas'.format(product_id) 
-        antennas = self.redis_server.lrange(ant_key, 0, 
-            self.redis_server.llen(ant_key))
-        # Build antenna sensor name
-        # Pick first antenna in list for now 
-        # (implement antenna consensus again if this approach proves faster)
-        ant_target = "{}_target".format(antennas[0])        
-        sensors_for_update.append(ant_target)
+#        # Once-off sensors to query on ?capture_done
+#        # Uncomment below to add sensors for query.
+#        # sensors_to_query = [] 
+#        # self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)
+#        sensors_for_update = self.build_sub_sensors(product_id)
+#        # Test the speed of retrieval for target information from an 
+#        # individual antenna:
+#        # Retrieve list of antennas:
+#        ant_key = '{}:antennas'.format(product_id) 
+#        antennas = self.redis_server.lrange(ant_key, 0, 
+#            self.redis_server.llen(ant_key))
+#        # Build antenna sensor name
+#        # Pick first antenna in list for now 
+#        # (implement antenna consensus again if this approach proves faster)
+#        ant_target = "{}_target".format(antennas[0])        
+#        sensors_for_update.append(ant_target)
         # Start io_loop to listen to sensors whose values should be registered
         # immediately when they change.
-        if(len(sensors_for_update) > 0):
-            loop = tornado.ioloop.IOLoop.current()
-            loop.add_callback(lambda: self.subscribe_list(product_id, 
-                sensors_for_update))
-            loop.start()
+#        if(len(sensors_for_update) > 0):
+#            loop = tornado.ioloop.IOLoop.current()
+#            loop.add_callback(lambda: self.subscribe_list(product_id, 
+#                sensors_for_update))
+#            loop.start()
 
     def _capture_stop(self, product_id):
         """Responds to capture-stop request.
@@ -614,45 +692,6 @@ class BLKATPortalClient(object):
         log.warning("Unrecognized alerts message")
 
 
-    @tornado.gen.coroutine
-    def unsubscribe_list(self, product_id):
-        """Unsubscribe from all sensor websocket subscriptions for 
-        the subarray designated by product_id.
-
-        Args: 
-            product_id (str): Name of the current subarray.
-
-        Returns:
-            None
-        """
-        yield self.subarray_katportals[product_id].unsubscribe(
-            namespace = self.namespaces[product_id])
-        yield self.subarray_katportals[product_id].disconnect()
-        # Stop io_loop
-        self.io_loop.stop()
-        log.info('Unsubscribed from sensors.')   
-
-    @tornado.gen.coroutine
-    def subscribe_list(self, product_id, sensor_list):
-        """Subscribes to each sensor listed for asynchronous updates.
-        
-        Args:
-            sensor_list (list): Full names of sensors to subscribe to.
-            product_id (str): The product ID given in the ?configure request.
-
-        Returns:
-            None
-        """
-        self.namespaces[product_id] = '{}_{}'.format(product_id, 
-            str(uuid.uuid4()))
-        yield self.subarray_katportals[product_id].connect()
-        result = yield self.subarray_katportals[product_id].subscribe(
-            namespace = self.namespaces[product_id]) 
-        for sensor in sensor_list:
-            # Using product_id to retrieve unique namespace
-            result = yield self.subarray_katportals[product_id].set_sampling_strategies(
-                self.namespaces[product_id], sensor, 'event')
-        log.info('Subscribed to {} sensors'.format(len(sensor_list)))
 
     def subarray_data_suspect(self, product_id):
         """Publish a global subarray data-suspect value by checking each
@@ -865,29 +904,6 @@ class BLKATPortalClient(object):
         cbf_sensors = self.gen_cbf_sensor_list(self.cbf_sensors, self.cbf_name)
         sensors_for_update.extend(cbf_sensors)
         return sensors_for_update
-
-    def component_name(self, short_name, pool_resources):
-        """Determine the full name of a subarray component. 
-        This is most needed in the case of "dev" components - 
-        for example, cbf_dev_2 instead of cbf_2.
-        Returns the first match.
-
-        Args:
-            short_name (str): Short name of component (eg 'cbf').
-            pool_resources (str): List of components (str) in current 
-            subarray.
-            log: Logger.
-
-        Returns:
-            full_name (str): Full name of component.
-        """
-        full_name = None
-        for component in pool_resources:
-            if short_name in component:
-                full_name = component
-        if full_name is None:
-            log.warning('Could not find component: {}'.format(short_name))
-        return full_name 
 
     def save_history(self, redis_server, product_id, key, value):
         """Save a particular key-value pair to a redis sensor history hash.

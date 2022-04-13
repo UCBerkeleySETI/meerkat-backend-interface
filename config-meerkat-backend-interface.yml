@@ -86,30 +86,29 @@ hashpipe_instances:
 # Locations for subarray numbers should be replaced with {} - e.g.
 # cbf_1:cbf_1_wide_sync_time should be included as cbf_{}:cbf_{}_wide_sync_time
 once_off:
-- sdp_{}:sdp_{}_subarray_product_ids
-- subarray_{}:subarray_{}_pool_resources
-- subarray_{}:subarray_{}_streams_wide_antenna_channelised_voltage_centre_frequency
-- cbf_{}:cbf_{}_wide_antenna_channelised_voltage_n_chans_per_substream
-- cbf_{}:cbf_{}_wide_antenna_channelised_voltage_spectra_per_heap
-- cbf_{}:cbf_{}_wide_sync_time
-- cbf_{}:cbf_{}_wide_antenna_channelised_voltage_n_samples_between_spectra
-- cbf_{}:cbf_{}_wide_adc_sample_rate
-- cbf_{}:cbf_{}_wide_input_labelling
+- sdp_{0}:sdp_{0}_subarray_product_ids
+- subarray_{0}:subarray_{0}_streams_wide_antenna_channelised_voltage_centre_frequency
+- cbf_{0}:cbf_{0}_wide_antenna_channelised_voltage_n_chans_per_substream
+- cbf_{0}:cbf_{0}_wide_antenna_channelised_voltage_spectra_per_heap
+- cbf_{0}:cbf_{0}_wide_sync_time
+- cbf_{0}:cbf_{0}_wide_antenna_channelised_voltage_n_samples_between_spectra
+- cbf_{0}:cbf_{0}_wide_adc_sample_rate
+- cbf_{0}:cbf_{0}_wide_input_labelling
 
 # Sensors for subscription
-# Of the format: <component>:<full_sensor_name>
+# Of the format: <full_sensor_name>
 
 subscription:
-- cbf_{}:cbf_{}_pos_request_base_azim
-- cbf_{}:cbf_{}_pos_request_base_ra
-- cbf_{}:cbf_{}_pos_request_base_dec
-- cbf_{}:cbf_{}_pos_request_base_elev
-- cbf_{}:cbf_{}_offset_ut1
+- cbf_{}_pos_request_base_azim
+- cbf_{}_pos_request_base_ra
+- cbf_{}_pos_request_base_dec
+- cbf_{}_pos_request_base_elev
+- cbf_{}_offset_ut1
 # Using the CBF target sensor as well as an antenna-based sensor as a backup.
-- cbf_{}:cbf_{}_target
-- subarray_{}:subarray_{}_observation_activity
-- subarray_{}:script_status 
-- subarray_{}:subarray_{}_streams_wide_antenna_channelised_voltage_input_data_suspect
+- cbf_{}_target
+- subarray_{}_observation_activity
+- subarray_{}_script_status 
+- subarray_{}_streams_wide_antenna_channelised_voltage_input_data_suspect
 
 # Other sensors retrieved separately
 
