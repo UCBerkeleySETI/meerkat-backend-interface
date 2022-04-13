@@ -1260,7 +1260,7 @@ class Coordinator(object):
         h = int(ra//15)
         m = int(ra%15*4)
         s = ra%15*4%1*60
-        ra_str = "{}:{}:{:.3f}".format(h, m, s)
+        ra_str = "{:02d}:{:02d}:{:06.3f}".format(h, m, s)
         return ra_str
 
     def dec_sexagesimal(self, dec):
@@ -1277,6 +1277,6 @@ class Coordinator(object):
         m_d = np.abs(dec)%1*60
         m = int(m_d)
         s = m_d%1*60
-        dec_str = "{}:{}:{:.3f}".format(d, m, s)
+        dec_str = "{:02d}:{:02d}:{:06.3f}".format(d, m, s)
         return dec_str
 
