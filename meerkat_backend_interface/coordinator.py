@@ -516,8 +516,7 @@ class Coordinator(object):
         self.pub_gateway_msg(self.red, subarray_group, 'DESTIP', '0.0.0.0', log, False)
         log.info('Subarray {} deconfigured'.format(description))
         # Release hosts:
-        chan_name = '{}:///gateway'.format(HPGDOMAIN)
-        self.pub_gateway_msg(self.red, chan_name, 'leave', description, log, True)
+        self.pub_gateway_msg(self.red, subarray_group, 'leave', description, log, True)
 
         # Get list of currently available hosts:
         if(self.red.exists('coordinator:free_hosts')):
