@@ -13,10 +13,11 @@ from meerkat_backend_interface import redis_tools
 from meerkat_backend_interface.telstate_interface import TelstateInterface
 from meerkat_backend_interface.logger import log, set_logger
 
-# Redis channels to listen to
+# Redis channels
 ALERTS_CHANNEL = redis_tools.REDIS_CHANNELS.alerts
 SENSOR_CHANNEL = redis_tools.REDIS_CHANNELS.sensor_alerts
 TRIGGER_CHANNEL = redis_tools.REDIS_CHANNELS.trigger_mode
+TARGETS_CHANNEL = 'target-selector'
 # Type of stream
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'
 # F-engine mode (so far 'wide' and 'narrow' are known to be available)
@@ -327,12 +328,12 @@ class Coordinator(object):
                 allowed_sources = self.red.lrange(allowed_key, 0, self.red.llen(allowed_key))
                 log.info('Filter by the following source names: {}'.format(allowed_sources)) 
                 if(target_str in allowed_sources):
-                    self.record_track(target_str, product_id, n_remaining)
+                    self.record_track(target_str, ra, dec, product_id, n_remaining)
                 else:
                     log.info('Target {} not in list of allowed sources, skipping...')
             else:
                 log.info('No list of allowed sources, proceeding...')
-                self.record_track(target_str, product_id, n_remaining)
+                self.record_track(target_str, ra, dec, product_id, n_remaining)
 
     def retrieve_cals(self, product_id):
         """Retrieves calibration solutions and saves them to Redis. They are 
@@ -366,7 +367,7 @@ class Coordinator(object):
         else:
             log.info("No calibration solution updates.")
 
-    def record_track(self, target_str, product_id, n_remaining): 
+    def record_track(self, target_str, ra_s, dec_s, product_id, n_remaining): 
         """Data recording is initiated by issuing a PKTSTART value to the 
            processing nodes in question via the Hashpipe-Redis gateway [1].
           
@@ -380,6 +381,8 @@ class Coordinator(object):
 
            Args:
                target_str (str): name of the current source. 
+               ra_s (str): RA of the target (sexagesimal form).
+               dec_s (str): Dec of the target (sexagesimal form).
                product_id (str): name of current subarray. 
                n_remaining (int): number of remaining recordings to take
                (including the current recording). 
@@ -433,6 +436,12 @@ class Coordinator(object):
         # all been delivered:
         self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 
             pkt_idx_start, log, False)
+
+        # Alert the target selector to the new pointing:
+        ra_deg = self.ra_degrees(ra_s)
+        dec_deg = self.dec_degrees(dec_s)
+        target_msg = '{}:{}:{}:{}:{}'.format(product_id, target_str, ra_deg, dec_deg, obsid)
+        self.red.publish(TARGETS_CHANNEL, target_msg)
 
         # Alert via slack:
         slack_message = "{}::meerkat:: New recording started for {}!".format(SLACK_CHANNEL, product_id)
@@ -1265,7 +1274,8 @@ class Coordinator(object):
 
     def dec_sexagesimal(self, dec):
         """Convert Dec from degree form to sexagesimal form. 
-           Currently displaying 3 decimal places for seconds. 
+           Currently displaying 3 decimal places for seconds.
+ 
            Args:
                dec (float): declination in degree form.
 
@@ -1280,3 +1290,25 @@ class Coordinator(object):
         dec_str = "{:02d}:{:02d}:{:06.3f}".format(d, m, s)
         return dec_str
 
+    def dec_degrees(self, dec_s):
+        """Convert RA from sexagesimal form to degree form. 
+        """
+        dec = dec_s.split(':')
+        d = int(dec[0])
+        m = int(dec[1])
+        s = float(dec[2])
+        if(dec[0][0] == '-'):
+            dec_d = d - m/60.0 - s/3600.0
+        else:
+            dec_d = d + m/60.0 + s/3600.0
+        return dec_d
+
+    def ra_degrees(self, ra_s):
+        """Convert RA from sexagesimal form to degree form. 
+        """
+        ra = ra_s.split(':')
+        h = int(ra[0])
+        m = int(ra[1])
+        s = float(ra[2])
+        return h*15 + m*0.25 + s*15.0/3600.0
+        
