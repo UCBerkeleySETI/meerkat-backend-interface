@@ -444,7 +444,8 @@ class Coordinator(object):
         self.red.set('new-target-info', target_information) 
         self.red.publish(TARGETS_CHANNEL, '{}:new-target')
         # For the minimal target selector (temporary):
-        target_information = 'new-target:{}:{}:{}:{}:{}'.format(product_id, target_str, ra_deg, dec_deg, obsid)
+        fecenter = self.centre_freq(product_id) 
+        target_information = 'new-target:{}:{}:{}:{}:{}:{}'.format(product_id, target_str, ra_deg, dec_deg, fecenter, obsid)
         self.red.publish(TARGETS_CHANNEL, target_information)
         
 
