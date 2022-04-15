@@ -696,8 +696,8 @@ class Coordinator(object):
             start_pkt = self.select_pkt_start(pkt_idxs, log, idx_margin)
             return start_pkt
         else:
-            log.warning('No active processing nodes. Cannot set PKTIDX')
-            return None
+            log.warning('No active processing nodes. Setting PKTIDX to 100000 for diagnostic purposes.')
+            return 100000
 
     def select_pkt_start(self, pkt_idxs, log, idx_margin):
         """Calculates the index of the first packet from which to record
