@@ -33,7 +33,7 @@ PROXY_CHANNEL = 'slack-messages'
 # Location to save calibration files for diagnostic purposes
 DIAGNOSTIC_LOC = '/home/obs/calibration_data' 
 # Unique telescope ID:
-TELESCOPE_NAME = 'meerkat64'
+TELESCOPE_NAME = 'MeerKAT'
 
 class Coordinator(object):
     """This class is used to coordinate receiving and recording F-engine data
