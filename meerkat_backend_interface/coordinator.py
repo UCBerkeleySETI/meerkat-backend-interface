@@ -17,7 +17,7 @@ from meerkat_backend_interface.logger import log, set_logger
 ALERTS_CHANNEL = redis_tools.REDIS_CHANNELS.alerts
 SENSOR_CHANNEL = redis_tools.REDIS_CHANNELS.sensor_alerts
 TRIGGER_CHANNEL = redis_tools.REDIS_CHANNELS.trigger_mode
-TARGETS_CHANNEL = 'target-selector'
+TARGETS_CHANNEL = 'target-selector:new-pointing'
 # Type of stream
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'
 # F-engine mode (so far 'wide' and 'narrow' are known to be available)
@@ -440,14 +440,10 @@ class Coordinator(object):
         # Alert the target selector to the new pointing:
         ra_deg = self.ra_degrees(ra_s)
         dec_deg = self.dec_degrees(dec_s)
-        target_information = '{}:{}:{}:{}:{}'.format(product_id, target_str, ra_deg, dec_deg, obsid)
-        self.red.set('new-target-info', target_information) 
-        self.red.publish(TARGETS_CHANNEL, '{}:new-target')
         # For the minimal target selector (temporary):
         fecenter = self.centre_freq(product_id) 
-        target_information = 'new-target:{}:{}:{}:{}:{}:{}'.format(product_id, target_str, ra_deg, dec_deg, fecenter, obsid)
+        target_information = '{}:{}:{}:{}:{}:{}'.format(obsid, target_str, ra_deg, dec_deg, fecenter)
         self.red.publish(TARGETS_CHANNEL, target_information)
-        
 
         # Alert via slack:
         slack_message = "{}::meerkat:: New recording started for {}!".format(SLACK_CHANNEL, product_id)
