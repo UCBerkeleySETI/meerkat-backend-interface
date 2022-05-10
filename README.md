@@ -17,7 +17,7 @@ Once acquired, the `Coordinator` publishes the appropriate commands to the proce
 * [KATCP Server](docs/KATCP_server.md)
 * [KATPortal Server](docs/KATPortal_server.md)
 * [Coordinator](docs/Coordinator.md)
-* [Redis Documentation](docs/Redis_Documentation.md)
+* [Redis Documentation](docs/REDIS_DOCUMENTATION.md)
 
 Other repositories that may be useful:
 
@@ -34,7 +34,7 @@ Other repositories that may be useful:
 * The `Katportal Client` sends requests for additional metadata to `CAM`. 
 * Target Selection and Beam Forming: This system (in a separate [repository](https://github.com/danielczech/meerkat_target_selector)) selects targets in the current field of view and sends them to the processing nodes. 
 
-For redis key formatting and respective value descriptions, please see the [Redis Documentation](docs/Redis_Documentation.md)
+For redis key formatting and respective value descriptions, please see the [Redis Documentation](docs/REDIS_DOCUMENTATION.md)
 
 ![diagram](diagram_2.png)
 
