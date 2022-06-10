@@ -24,6 +24,8 @@ STREAM_TYPE = 'cbf.antenna_channelised_voltage'
 FENG_TYPE = 'wide.antenna-channelised-voltage'
 # Hashpipe-Redis gateway domain
 HPGDOMAIN   = 'bluse'
+# Processing gateway domain
+PROCDOMAIN   = 'blproc'
 # Safety margin for setting index of first packet to record.
 PKTIDX_MARGIN = 2048
 # Slack channel to publish to:
@@ -217,13 +219,21 @@ class Coordinator(object):
                 free_hosts = free_hosts[n_red_chans:]
                 redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
             log.info('Allocated {} hosts to {}'.format(n_red_chans, product_id))
-            # Create Hashpipe-Redis Gateway group for current subarray:
+            # Create Hashpipe-Redis Gateway groups for the current subarray:
+            # One for HPGDOMAIN and one for PROCDOMAIN
             # Using groups feature (please see rb-hashpipe documentation).
-            # This group will be given the name of the current subarray. 
-            # The group can be addressed as follows: <HPGDOMAIN>:<group>///set
+            # These groups will be given the name of the current subarray. 
+            # The groups can be addressed as follows: <HPGDOMAIN>:<group>///set
+            # and <PROCDOMAIN>:<group>///set
+            # Note: while the coordinator cleans up and empties the HPGDOMAIN 
+            # group, it does not do so for the PROCDOMAIN group (since processing
+            # continues after deconfiguration). This is expected of the automator
+            # process.  
             for i in range(len(allocated_hosts)):
-                chan_name = '{}://{}/gateway'.format(HPGDOMAIN, allocated_hosts[i])
-                self.pub_gateway_msg(self.red, chan_name, 'join', product_id, log, True)
+                hpg_gateway = '{}://{}/gateway'.format(HPGDOMAIN, allocated_hosts[i])
+                self.pub_gateway_msg(self.red, hpg_gateway, 'join', product_id, log, True)
+                proc_gateway = '{}://{}/gateway'.format(PROCDOMAIN, allocated_hosts[i])
+                self.pub_gateway_msg(self.red, proc_gateway, 'join', product_id, log, True)
             
             # Apply to processing nodes
             subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
@@ -438,11 +448,14 @@ class Coordinator(object):
             pkt_idx_start, log, False)
 
         # Alert the target selector to the new pointing:
+        log.info(ra_s)
         ra_deg = self.ra_degrees(ra_s)
         dec_deg = self.dec_degrees(dec_s)
         # For the minimal target selector (temporary):
         fecenter = self.centre_freq(product_id) 
-        target_information = '{}:{}:{}:{}:{}:{}'.format(obsid, target_str, ra_deg, dec_deg, fecenter)
+        log.info(fecenter)
+        target_information = '{}:{}:{}:{}:{}'.format(obsid, target_str, ra_deg, dec_deg, fecenter)
+        log.info(target_information)
         self.red.publish(TARGETS_CHANNEL, target_information)
 
         # Alert via slack:
@@ -527,6 +540,8 @@ class Coordinator(object):
         self.pub_gateway_msg(self.red, subarray_group, 'DESTIP', '0.0.0.0', log, False)
         log.info('Subarray {} deconfigured'.format(description))
         # Release hosts:
+        # NOTE: hosts are NOT released from the PROCDOMAIN groups since processing
+        # continues post deconfiguration. This is expected of the automator process. 
         self.pub_gateway_msg(self.red, subarray_group, 'leave', description, log, True)
 
         # Get list of currently available hosts:
@@ -1092,7 +1107,9 @@ class Coordinator(object):
         """
         sensor_key = self.stream_sensor_name(product_id,
             'antenna_channelised_voltage_centre_frequency')
+        log.info(sensor_key)
         centre_freq = self.red.get(sensor_key)
+        log.info(centre_freq)
         centre_freq = float(centre_freq)/1e6
         centre_freq = '{0:.17g}'.format(centre_freq)
         return centre_freq
