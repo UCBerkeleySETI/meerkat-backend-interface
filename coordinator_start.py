@@ -22,7 +22,7 @@ def cli(prog = sys.argv[0]):
                                   \'nshot:<n>\': PKTSTART will be sent 
                                   for <n> tracked targets.  
                            """,
-                      default = 'nshot:9')
+                      default = 'nshot:0')
     (opts, args) = parser.parse_args()
     main(port=opts.port, cfg_file=opts.cfg_file, trigger_mode=opts.trigger_mode)
 
