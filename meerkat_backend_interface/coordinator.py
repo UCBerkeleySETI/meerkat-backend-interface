@@ -540,26 +540,10 @@ class Coordinator(object):
         # Send deconfigure message to these specific hosts:
         self.pub_gateway_msg(self.red, subarray_group, 'DESTIP', '0.0.0.0', log, False)
         log.info('Subarray {} deconfigured'.format(description))
-        # Release hosts:
-        # NOTE: hosts are NOT released from the PROCDOMAIN groups since processing
-        # continues post deconfiguration. This is expected of the automator process. 
-        self.pub_gateway_msg(self.red, subarray_group, 'leave', description, log, True)
 
-        # Get list of currently available hosts:
-        if(self.red.exists('coordinator:free_hosts')):
-            free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
-                self.red.llen('coordinator:free_hosts'))
-        else:
-            free_hosts = []
-        # Append released hosts and write 
-        free_hosts = free_hosts + allocated_hosts
-        # NOTE: in future, get rid of write_list_redis function and append or pop. 
-        # This will simplify this step.
-        redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
-        # Remove resources from current subarray 
-        self.red.delete('coordinator:allocated_hosts:{}'.format(description))
-        log.info("Released {} hosts; {} hosts available".format(len(allocated_hosts), 
-                len(free_hosts)))
+        # NOTE: Host release is handled by the automator, which still needs them for
+        # pipeline processing commands. 
+
 
     def data_suspect(self, description, value): 
         """Parse and publish data-suspect mask to the appropriate 
