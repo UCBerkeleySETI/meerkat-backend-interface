@@ -415,8 +415,6 @@ class Coordinator(object):
 
         # Retrieve DATADIR from these specific hosts:
         datadir = self.datadir(product_id, allocated_hosts)
-        # Save current DATADIR to a Redis key:
-        self.red.set('{}:datadir'.format(product_id), datadir)
         # Publish DATADIR to gateway
         self.pub_gateway_msg(self.red, subarray_group, 'DATADIR', datadir, 
             log, False)
@@ -984,6 +982,8 @@ class Coordinator(object):
         except:
             log.error("Schedule block IDs not available")
             log.warning("Setting DATADIR='{}/Unknown_SB".format(upper_dir))
+        # Save current SB ID to a Redis key:
+        self.red.set('{}:current_sb_id'.format(product_id), current_sb_id)
         datadir = '{}/{}'.format(upper_dir, current_sb_id)
         return datadir
 
