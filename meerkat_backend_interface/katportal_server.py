@@ -182,11 +182,11 @@ class BLKATPortalClient(object):
                         #    self.fetch_once(cbf_on_track_names, product_id,
                         #        3, 30, 0.5)
                         publish_to_redis(self.redis_server, 
-                        REDIS_CHANNELS.sensor_alerts, 
+                        REDIS_CHANNELS.alerts, 
                         '{}:{}'.format('tracking', product_id))
                     else:
                         publish_to_redis(self.redis_server, 
-                        REDIS_CHANNELS.sensor_alerts, 
+                        REDIS_CHANNELS.alerts, 
                         '{}:{}'.format('not-tracking', product_id))
                 # If script not running, attempt to unsubscribe from sensors
                 elif('script_status' in sensor_name):
