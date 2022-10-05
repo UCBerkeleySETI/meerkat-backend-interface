@@ -370,7 +370,7 @@ class BLKATPortalClient(object):
         """
         log.info("Sensor values on configure acquired for {}.".format(product_id))
         # Alert via slack:
-        slack_message = "{}::meerkat:: Successful subarray configuration".format(SLACK_CHANNEL)
+        slack_message = "{}:*Successful subarray configuration for {}*".format(SLACK_CHANNEL, product_id)
         publish_to_redis(self.redis_server, PROXY_CHANNEL, slack_message)
 
     def _capture_init(self, product_id):
@@ -507,6 +507,9 @@ class BLKATPortalClient(object):
             # Delete current subarray client:
             self.subarray_katportals.pop(product_id)
             log.info("Deleted KATPortalClient instance for product_id: {}".format(product_id))
+        # Alert via slack:
+        slack_message = "{}:{} deconfigured".format(SLACK_CHANNEL, product_id)
+        publish_to_redis(self.redis_server, PROXY_CHANNEL, slack_message)
  
     def _other(self, product_id):
         """This is called when an unrecognized request is sent.
