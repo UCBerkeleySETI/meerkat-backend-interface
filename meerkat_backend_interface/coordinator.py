@@ -458,7 +458,7 @@ class Coordinator(object):
         self.red.publish(TARGETS_CHANNEL, target_information)
 
         # Alert via slack:
-        slack_message = "{}:New recording started for {}!".format(SLACK_CHANNEL, product_id)
+        slack_message = "{}:New recording {} started for {}!".format(SLACK_CHANNEL, datadir, product_id)
         self.red.publish(PROXY_CHANNEL, slack_message)
 
         # Set subarray state to 'tracking':
