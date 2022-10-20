@@ -24,8 +24,6 @@ STREAM_TYPE = 'cbf.antenna_channelised_voltage'
 FENG_TYPE = 'wide.antenna-channelised-voltage'
 # Hashpipe-Redis gateway domain
 HPGDOMAIN   = 'bluse'
-# Processing gateway domain
-PROCDOMAIN   = 'blproc'
 # Safety margin for setting index of first packet to record.
 PKTIDX_MARGIN = 2048
 # Slack channel to publish to:
@@ -219,22 +217,13 @@ class Coordinator(object):
                 free_hosts = free_hosts[n_red_chans:]
                 redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
             log.info('Allocated {} hosts to {}'.format(n_red_chans, product_id))
-            # Create Hashpipe-Redis Gateway groups for the current subarray:
-            # One for HPGDOMAIN and one for PROCDOMAIN
+            # Create Hashpipe-Redis Gateway group for the current subarray:
             # Using groups feature (please see rb-hashpipe documentation).
             # These groups will be given the name of the current subarray. 
             # The groups can be addressed as follows: <HPGDOMAIN>:<group>///set
-            # and <PROCDOMAIN>:<group>///set
-            # Note: while the coordinator cleans up and empties the HPGDOMAIN 
-            # group, it does not do so for the PROCDOMAIN group (since processing
-            # continues after deconfiguration). This is expected of the automator
-            # process.  
             for i in range(len(allocated_hosts)):
                 hpg_gateway = '{}://{}/gateway'.format(HPGDOMAIN, allocated_hosts[i])
                 self.pub_gateway_msg(self.red, hpg_gateway, 'join', product_id, log, True)
-                proc_gateway = '{}://{}/gateway'.format(PROCDOMAIN, allocated_hosts[i])
-                self.pub_gateway_msg(self.red, proc_gateway, 'join', product_id, log, True)
-            
             # Apply to processing nodes
             subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
 
@@ -539,8 +528,25 @@ class Coordinator(object):
         self.pub_gateway_msg(self.red, subarray_group, 'DESTIP', '0.0.0.0', log, False)
         log.info('Subarray {} deconfigured'.format(description))
 
-        # NOTE: Host release is handled by the automator, which still needs them for
-        # pipeline processing commands. 
+        # Release hosts (note: the automator still controls when nshot is set > 0;
+        # this ensures recording does not take place while processing is still ongoing).
+        self.red.publish(subarray_group, 'leave={}'.format(description))
+        # Get list of currently available hosts:
+        if self.red.exists('coordinator:free_hosts'):
+            free_hosts = self.red.lrange('coordinator:free_hosts', 0,
+                self.red.llen('coordinator:free_hosts'))
+            self.red.delete('coordinator:free_hosts')
+        else:
+            free_hosts = []
+        # Append released hosts and write 
+        # Do this first, since these hosts are free already, and 
+        # update keys afterwards. 
+        free_hosts = free_hosts + allocated_hosts
+        self.red.rpush('coordinator:free_hosts', *free_hosts)    
+        # Remove resources from current subarray 
+        self.red.delete('coordinator:allocated_hosts:{}'.format(description))
+            log.info("Released {} hosts; {} hosts available".format(len(allocated_hosts),
+                                                                    len(free_hosts)))
 
 
     def data_suspect(self, description, value): 
