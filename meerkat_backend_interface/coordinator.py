@@ -75,6 +75,7 @@ class Coordinator(object):
         redis_port = redis_endpoint.split(':')[1]
         self.red = redis.StrictRedis(host=redis_host, port=redis_port, decode_responses=True)
         self.cfg_file = cfg_file
+        # Read global trigger mode:
         self.trigger_mode = trigger_mode # This is the default trigger_mode (for all subarrays)
         log = set_logger(log_level = logging.DEBUG)
 
@@ -192,8 +193,9 @@ class Coordinator(object):
         # portion of the full band.
         offset = self.ip_offset(product_id)
         # Initialise trigger mode
-        self.red.set('coordinator:trigger_mode:{}'.format(description), self.trigger_mode)
-        log.info('Trigger mode for {} on configuration: {}'.format(description, self.trigger_mode))
+        if self.red.get('coordinator:trigger_mode:{}'.format(description)) is None:
+            log.info('No trigger mode found on configuration, defaulting to {}'.format(self.trigger_mode))
+            self.red.set('coordinator:trigger_mode:{}'.format(description), self.trigger_mode)
         # Generate list of stream IP addresses and publish appropriate messages to 
         # processing nodes:
         addr_list, port, n_addrs, n_red_chans = self.ip_addresses(product_id, offset)
@@ -545,8 +547,8 @@ class Coordinator(object):
         self.red.rpush('coordinator:free_hosts', *free_hosts)    
         # Remove resources from current subarray 
         self.red.delete('coordinator:allocated_hosts:{}'.format(description))
-            log.info("Released {} hosts; {} hosts available".format(len(allocated_hosts),
-                                                                    len(free_hosts)))
+        log.info("Released {} hosts; {} hosts available".format(len(allocated_hosts),
+                                                                len(free_hosts)))
 
 
     def data_suspect(self, description, value): 
