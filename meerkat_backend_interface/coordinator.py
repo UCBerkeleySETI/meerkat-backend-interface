@@ -520,19 +520,23 @@ class Coordinator(object):
         array_key = 'coordinator:allocated_hosts:{}'.format(description)
         allocated_hosts = self.red.lrange(array_key, 0, 
                 self.red.llen(array_key))
+
         # Build list of Hashpipe-Redis Gateway channels to publish to:
         chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
 
-        # Current subarray group:       
-        subarray_group = '{}:{}///set'.format(HPGDOMAIN, description)
+        # Set DESTIP to 0.0.0.0 individually for robustness. 
+        for chan in chan_list:
+            self.pub_gateway_msg(self.red, chan, 'DESTIP', '0.0.0.0', log, False)
+        
+        log.info('Instructed hosts for {} to unsubscribe from multicast groups'.format(description))
 
-        # Send deconfigure message to these specific hosts:
-        self.pub_gateway_msg(self.red, subarray_group, 'DESTIP', '0.0.0.0', log, False)
-        log.info('Subarray {} deconfigured'.format(description))
+        # Instruct gateways to leave current subarray group:   
+        subarray_group = '{}:{}///set'.format(HPGDOMAIN, description)
+        self.red.publish(subarray_group, 'leave={}'.format(description))
+        log.info('Disbanded gateway group: {}'.format(description))
 
         # Release hosts (note: the automator still controls when nshot is set > 0;
         # this ensures recording does not take place while processing is still ongoing).
-        self.red.publish(subarray_group, 'leave={}'.format(description))
         # Get list of currently available hosts:
         if self.red.exists('coordinator:free_hosts'):
             free_hosts = self.red.lrange('coordinator:free_hosts', 0,
@@ -549,7 +553,7 @@ class Coordinator(object):
         self.red.delete('coordinator:allocated_hosts:{}'.format(description))
         log.info("Released {} hosts; {} hosts available".format(len(allocated_hosts),
                                                                 len(free_hosts)))
-
+        log.info('Subarray {} deconfigured'.format(description))
 
     def data_suspect(self, description, value): 
         """Parse and publish data-suspect mask to the appropriate 
