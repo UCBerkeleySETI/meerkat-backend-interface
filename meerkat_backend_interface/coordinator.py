@@ -415,27 +415,21 @@ class Coordinator(object):
             log, False)
 
         # Calculate PKTSTART
-        pkt_idx_start = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log)
+        pktidx_start = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log, product_id)
 
-        # Acquire timestamp associated with PKTSTART (needed for OBSID)
-        # Seconds since SYNCTIME: PKTIDX*HCLOCKS/(2e6*FENCHAN*ABS(CHAN_BW))
-        hclocks = self.red.get('{}:hclocks'.format(product_id))
-        synctime = self.red.get('{}:synctime'.format(product_id))
-        fenchan = self.red.get('{}:fenchan'.format(product_id))
-        chan_bw = self.red.get('{}:chan_bw'.format(product_id))
-        pktstart_ts = float(synctime) + pkt_idx_start*float(hclocks)/(2e6*float(fenchan)*np.abs(float(chan_bw)))
-        pktstart_ts = datetime.utcfromtimestamp(pktstart_ts).strftime("%Y%m%dT%H%M%SZ")
+        pktidx_start_ts = self.pktidx_to_ts(pktidx_start, product_id)
+        pktidx_start_ts = datetime.utcfromtimestamp(pktidx_start_ts).strftime("%Y%m%dT%H%M%SZ")
 
         # Publish OBSID to the gateway:
         # OBSID is a unique identifier for a particular observation. 
-        obsid = "{}:{}:{}".format(TELESCOPE_NAME, product_id, pktstart_ts)
+        obsid = "{}:{}:{}".format(TELESCOPE_NAME, product_id, pktidx_start_ts)
         self.pub_gateway_msg(self.red, subarray_group, 'OBSID', obsid,
             log, False)
 
         # Set PKTSTART separately after all the above messages have 
         # all been delivered:
         self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 
-            pkt_idx_start, log, False)
+            pktidx_start, log, False)
 
         # Alert the target selector to the new pointing:
         log.info(ra_s)
@@ -680,7 +674,7 @@ class Coordinator(object):
             log.warning('Cannot acquire {}'.format(host_key))
         return pkt_idx
 
-    def get_start_idx(self, host_list, idx_margin, log):
+    def get_start_idx(self, host_list, idx_margin, log, product_id):
         """Calculate the packet index at which recording should begin
         (synchronously) for all processing nodes.
     
@@ -704,13 +698,13 @@ class Coordinator(object):
             if(pkt_idx is not None):
                 pkt_idxs = pkt_idxs + [pkt_idx]
         if(len(pkt_idxs) > 0):
-            start_pkt = self.select_pkt_start(pkt_idxs, log, idx_margin)
+            start_pkt = self.select_pkt_start(pkt_idxs, log, idx_margin, product_id)
             return start_pkt
         else:
             log.warning('No active processing nodes. Setting PKTIDX to 100000 for diagnostic purposes.')
             return 100000
 
-    def select_pkt_start(self, pkt_idxs, log, idx_margin):
+    def select_pkt_start(self, pkt_idxs, log, idx_margin, product_id):
         """Calculates the index of the first packet from which to record
         for each processing node.
 
@@ -726,12 +720,33 @@ class Coordinator(object):
             data.
         """
         pkt_idxs = np.asarray(pkt_idxs, dtype = np.int64)
-        maximum = np.max(pkt_idxs)
-        median = np.median(pkt_idxs)
-        minimum = np.min(pkt_idxs)
+        max_idx = self.pktidx_to_ts(np.max(pkt_idxs), product_id)
+        med_idx = self.pktidx_to_ts(np.median(pkt_idxs), product_id)
+        min_idx = self.pktidx_to_ts(np.min(pkt_idxs), product_id)
+        # Error if vary by more than 60 seconds:
+        if (max_idx - min_idx) > 60:  
+            log.error('PKTIDX varies by more than 60 seconds across instances')
+            # Alert via slack:
+            msg = "{}:coordinator: PKTIDX varies by >60 seconds for {}".format(SLACK_CHANNEL, product_id)
+            self.red.publish(PROXY_CHANNEL, msg)
         pktstart = np.max(pkt_idxs) + idx_margin
-        log.info("PKTIDX: Min {}, Median {}, Max {}, PKTSTART {}".format(minimum, median, maximum, pktstart))
+        log.info("PKTIDX: Min {}, Median {}, Max {}, PKTSTART {}".format(min_idx, med_idx, max_idx, pktstart))
         return pktstart
+
+    def pktidx_to_ts(self, pktidx, product_id):
+        """Converts a PKTIDX value into a timestamp using current gateway
+        keys. 
+        """
+        #TODO: put this (along with many other helper functions) into 
+        # a proper utilities module. 
+        # Retrieve current metadata values:
+        hclocks = float(self.red.get('{}:hclocks'.format(product_id)))
+        synctime = float(self.red.get('{}:synctime'.format(product_id)))
+        fenchan = float(self.red.get('{}:fenchan'.format(product_id)))
+        chan_bw = float(self.red.get('{}:chan_bw'.format(product_id)))
+        # Seconds since SYNCTIME: PKTIDX*HCLOCKS/(2e6*FENCHAN*ABS(CHAN_BW))
+        pktidx_ts = synctime + pktidx*hclocks/(2e6*fenchan*np.abs(chan_bw))
+        return pktidx_ts
 
     def host_list(self, hpgdomain, hosts):
         """Build a list of Hashpipe-Redis Gateway channels from a list 
