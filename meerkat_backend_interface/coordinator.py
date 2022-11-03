@@ -201,6 +201,14 @@ class Coordinator(object):
         addr_list, port, n_addrs, n_red_chans = self.ip_addresses(product_id, offset)
         # Allocate hosts for the current subarray:
         if(self.red.exists('coordinator:free_hosts')): # If key exists, there are free hosts
+            # Clear any prior nshot values ahead of host allocation:
+            trigger_mode = 'nshot:0'
+            self.red.set('coordinator:trigger_mode:{}'.format(product_id), trigger_mode)
+            log.info('nshot set to 0 prior to host allocation')
+            # Alert via slack:
+            msg = "{}:coordinator: nshot cleared for {}".format(SLACK_CHANNEL, product_id)
+            self.red.publish(PROXY_CHANNEL, msg)
+            # Host allocation:
             free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
                 self.red.llen('coordinator:free_hosts'))
             allocated_hosts = free_hosts[0:n_red_chans]
