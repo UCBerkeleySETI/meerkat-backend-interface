@@ -183,8 +183,9 @@ class BLKATPortalClient(object):
                         #        3, 30, 0.5)
                         # Fetch project ID:
                         proposal_id_sensor = 'subarray_{}_observation_script_proposal_id'.format(product_id[-1])
+                        proposal_id_component = 'subarray_{}'.format(product_id[1])
                         self.fetch_once(proposal_id_sensor, product_id,
-                                3, 30, 0.5)
+                                3, 30, 0.5, proposal_id_component)
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.alerts, 
                         '{}:{}'.format('tracking', product_id))
@@ -264,7 +265,8 @@ class BLKATPortalClient(object):
         if(len(self.conf_sensors) > 0):
             conf_sensor_names = ['subarray_{}_'.format(subarray_nr) 
                 + sensor for sensor in self.conf_sensors]
-            self.fetch_once(conf_sensor_names, product_id, 3, 210, 0.5)
+            conf_component = 'subarray_{}'.format(subarray_nr)
+            self.fetch_once(conf_sensor_names, product_id, 3, 210, 0.5, conf_component)
         # Get CBF component name (in case it has changed to 
         # CBF_DEV_[product_id] instead of CBF_[product_id])
         key = '{}:subarray_{}_{}'.format(product_id, subarray_nr, 
@@ -278,10 +280,11 @@ class BLKATPortalClient(object):
         if(len(self.cbf_conf_sensors) > 0):
             # Complete the CBF sensor names with the CBF component name.
             cbf_sensor_prefix = '{}_{}_'.format(self.cbf_name, cbf_prefix)
+            cbf_component = '{}_{}'.format(self.cbf_name, cbf_prefix)
             cbf_conf_sensor_names = [cbf_sensor_prefix + 
                 sensor for sensor in self.cbf_conf_sensors]
             # Get CBF sensors and write to redis.
-            self.fetch_once(cbf_conf_sensor_names, product_id, 3, 210, 0.5)
+            self.fetch_once(cbf_conf_sensor_names, product_id, 3, 210, 0.5, cbf_component)
             # Calculate antenna-to-Fengine mapping
             antennas, feng_ids = self.antenna_mapping(product_id, 
                 cbf_sensor_prefix)
@@ -294,7 +297,8 @@ class BLKATPortalClient(object):
             stream_conf_sensors = ['subarray_{}_streams_{}_{}'.format(
                 subarray_nr, cbf_prefix, sensor) for sensor in 
                 self.stream_conf_sensors]
-            self.fetch_once(stream_conf_sensors, product_id, 3, 210, 0.5)  
+            stream_component = 'subarray_{}'.format(subarray_nr)
+            self.fetch_once(stream_conf_sensors, product_id, 3, 210, 0.5, stream_component)  
         # Retrieve Telstate Redis DB endpoint information for the current 
         # subarray. Each time a new subarray is built, a new Telstate Redis 
         # DB is created.
@@ -392,7 +396,7 @@ class BLKATPortalClient(object):
         # Schedule block IDs (sched_observation_schedule_1) 
         # This is the list of schedule block IDs. The currently running block
         # will be in position 1.
-        self.fetch_once('sched_observation_schedule_1', product_id, 3, 210, 0.5)
+        self.fetch_once('sched_observation_schedule_1', product_id, 3, 210, 0.5, 'sched')
         # Schedule blocks - pointing list
         retries = 3
         # Increase the timeout by this factor on subsequent retries
@@ -851,7 +855,7 @@ class BLKATPortalClient(object):
         time = time.strftime("%Y%m%dT%H%M%S.000Z")
         redis_server.hset(hash_name, time, value)
 
-    def fetch_once(self, sensor_names, product_id, retries, sync_timeout, timeout_factor):
+    def fetch_once(self, sensor_names, product_id, retries, sync_timeout, timeout_factor, component):
         """Handles once-off sensor requests, permitting retries in case there are problems 
         on the CAM side. Once the sensor values are retrieved, the name-value pair are 
         written to the Redis database.
@@ -863,13 +867,14 @@ class BLKATPortalClient(object):
             product_id (str): The product ID for the current subarray.
             retries (int): The number of times to attempt fetching the sensor values.
             sync_timeout (int): The maximum time to wait for sensor values from CAM. 
+            component (str): The name of the subcomponent of the sensor. 
 
             None.
         """ 
         for i in range(retries):
             try:
                 self.io_loop.run_sync(lambda: self._get_sensor_values(
-                    product_id, sensor_names), 
+                    product_id, sensor_names, component), 
                     timeout = sync_timeout + int(sync_timeout*timeout_factor*i))
                 # If sensors succesfully queried and written to Redis, break.
                 break 
@@ -931,7 +936,7 @@ class BLKATPortalClient(object):
         raise tornado.gen.Return(blocks)
 
     @tornado.gen.coroutine
-    def _get_sensor_values(self, product_id, targets):
+    def _get_sensor_values(self, product_id, targets, component):
         """Gets sensor values associated with the current subarray and
         writes them to the Redis database.
 
@@ -961,7 +966,7 @@ class BLKATPortalClient(object):
             # This is said to cause fewer timeout problems. 
             query = "|".join(sensor_names)
             try:
-                sensor_details = yield client.sensor_values(query, 
+                sensor_details = yield client.sensor_values(query, component=component, 
                     include_value_ts=True)
                 for sensor, details in sensor_details.items():
                     sensor_dict = self._convert_SensorSampleValueTime_to_dict(details)
