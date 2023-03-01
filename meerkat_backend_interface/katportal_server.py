@@ -405,8 +405,9 @@ class BLKATPortalClient(object):
                     REDIS_CHANNELS.sensor_alerts, key)
                 # If success, break.
                 break
-            except:
+            except Exception as e:
                 log.warning("Could not retrieve schedule blocks: attempt {} of {}".format(i + 1, retries))
+                log.error(e)
         # If retried <retries> times, then log an error.
         if(i == (retries - 1)):
             log.error("Could not retrieve schedule blocks: {} attempts, giving up.".format(retries))
@@ -869,9 +870,10 @@ class BLKATPortalClient(object):
                     timeout = sync_timeout + int(sync_timeout*timeout_factor*i))
                 # If sensors succesfully queried and written to Redis, break.
                 break 
-            except:
+            except Exception as e:
                 log.warning("Could not retrieve once-off sensors: attempt {} of {}".format(
                     i + 1, retries))
+                log.error(e)
         # If retried <retries> times, then log an error.
         if(i == (retries - 1)):
             log.error("Could not retrieve once-off sensors: {} attempts, giving up.".format(
