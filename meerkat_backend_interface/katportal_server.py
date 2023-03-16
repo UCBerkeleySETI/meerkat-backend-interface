@@ -948,16 +948,13 @@ class BLKATPortalClient(object):
         if not targets:
             log.warning("Sensor list empty. Not querying katportal...")
             raise tornado.gen.Return(sensors_and_values)
-        client = self.subarray_katportals[product_id]
-        sensor_names = yield client.sensor_names(targets)
-        if not sensor_names:
-            log.warning("No matching sensors found!")
         else:
+            client = self.subarray_katportals[product_id]
             # Query approach:
             # Instead of sequentially querying each sensor, build a regex query
             # and fetch them all at once at the suggestion of ebarr. 
             # This is said to cause fewer timeout problems. 
-            query = "|".join(sensor_names)
+            query = "|".join(targets)
             try:
                 sensor_details = yield client.sensor_values(query, 
                     include_value_ts=True)
