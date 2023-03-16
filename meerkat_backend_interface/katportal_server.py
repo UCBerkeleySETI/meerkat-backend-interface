@@ -390,27 +390,27 @@ class BLKATPortalClient(object):
         # will be in position 1.
         self.fetch_once('sched_observation_schedule_1', product_id, 3, 210, 0.5)
         # Schedule blocks - pointing list
-        retries = 3
+        #retries = 3
         # Increase the timeout by this factor on subsequent retries
-        timeout_factor = 0.5 
-        for i in range(0, retries):
-            try:
-                schedule_blocks = self.io_loop.run_sync(
-                    lambda: self._get_future_targets(product_id),
-                    timeout = 30 + timeout_factor*i*30)
-                key = "{}:schedule_blocks".format(product_id)
-                write_pair_redis(self.redis_server, key, 
-                    json.dumps(schedule_blocks))
-                publish_to_redis(self.redis_server, 
-                    REDIS_CHANNELS.sensor_alerts, key)
-                # If success, break.
-                break
-            except Exception as e:
-                log.warning("Could not retrieve schedule blocks: attempt {} of {}".format(i + 1, retries))
-                log.error(e)
-        # If retried <retries> times, then log an error.
-        if(i == (retries - 1)):
-            log.error("Could not retrieve schedule blocks: {} attempts, giving up.".format(retries))
+        #timeout_factor = 0.5 
+        #for i in range(0, retries):
+        #    try:
+        #        schedule_blocks = self.io_loop.run_sync(
+        #            lambda: self._get_future_targets(product_id),
+        #            timeout = 30 + timeout_factor*i*30)
+        #        key = "{}:schedule_blocks".format(product_id)
+        #        write_pair_redis(self.redis_server, key, 
+        #            json.dumps(schedule_blocks))
+        #        publish_to_redis(self.redis_server, 
+        #            REDIS_CHANNELS.sensor_alerts, key)
+        #        # If success, break.
+        #        break
+        #    except Exception as e:
+        #        log.warning("Could not retrieve schedule blocks: attempt {} of {}".format(i + 1, retries))
+        #        log.error(e)
+        ## If retried <retries> times, then log an error.
+        #if(i == (retries - 1)):
+        #    log.error("Could not retrieve schedule blocks: {} attempts, giving up.".format(retries))
 
     def _capture_start(self, product_id):
         """Responds to capture-start request. Subscriptions to required 
