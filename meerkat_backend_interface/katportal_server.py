@@ -351,6 +351,7 @@ class BLKATPortalClient(object):
         # TODO: Merge this function with _get_sensor_values and enable the retrieval of 
         # sensors from different subarray components. 
         try:
+            log.info('Fetching: {}'.format(pattern)) 
             sensor_details = yield client.sensor_values(pattern, include_value_ts=True)
             return(sensor_details)
         except Exception as e:
@@ -956,6 +957,7 @@ class BLKATPortalClient(object):
             # This is said to cause fewer timeout problems. 
             query = "|".join(targets)
             try:
+                log.info('Fetching sensors: {}'.format(query))
                 sensor_details = yield client.sensor_values(query, 
                     include_value_ts=True)
                 for sensor, details in sensor_details.items():
