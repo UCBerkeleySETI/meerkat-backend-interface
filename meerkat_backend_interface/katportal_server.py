@@ -389,7 +389,7 @@ class BLKATPortalClient(object):
         # Schedule block IDs (sched_observation_schedule_1) 
         # This is the list of schedule block IDs. The currently running block
         # will be in position 1.
-        self.fetch_once('sched_observation_schedule_1', product_id, 3, 210, 0.5)
+        self.fetch_once(['sched_observation_schedule_1'], product_id, 3, 210, 0.5)
         # Schedule blocks - pointing list
         #retries = 3
         # Increase the timeout by this factor on subsequent retries
