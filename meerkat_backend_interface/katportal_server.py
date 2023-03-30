@@ -182,7 +182,7 @@ class BLKATPortalClient(object):
                         #    self.fetch_once(cbf_on_track_names, product_id,
                         #        3, 30, 0.5)
                         # Fetch project ID:
-                        proposal_id_sensor = 'subarray_{}_observation_script_proposal_id'.format(product_id[-1])
+                        proposal_id_sensor = 'subarray_{}_script_proposal_id'.format(product_id[-1])
                         self.fetch_once([proposal_id_sensor], product_id,
                                 3, 210, 0.5)
                         publish_to_redis(self.redis_server, 
