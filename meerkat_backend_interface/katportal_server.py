@@ -172,19 +172,6 @@ class BLKATPortalClient(object):
                 # Observation state for publication
                 elif('activity' in sensor_name):
                     if(sensor_value == 'track'):
-                        # Uncomment below to retrieve once-off CBF sensor values
-                        # if(len(self.cbf_on_track) > 0):
-                        #    # Complete the CBF sensor names with the CBF 
-                        #    # component name.
-                        #    cbf_on_track_names = ['{}_'.format(self.cbf_name) +
-                        #        sensor for sensor in self.cbf_on_track]
-                        #    # Get CBF sensors and write to redis.
-                        #    self.fetch_once(cbf_on_track_names, product_id,
-                        #        3, 30, 0.5)
-                        # Fetch project ID:
-                        proposal_id_sensor = 'subarray_{}_script_proposal_id'.format(product_id[-1])
-                        self.fetch_once([proposal_id_sensor], product_id,
-                                3, 210, 0.5)
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.alerts, 
                         '{}:{}'.format('tracking', product_id))
@@ -433,13 +420,11 @@ class BLKATPortalClient(object):
         # Save capture-start time:
         write_pair_redis(self.redis_server, '{}:last-capture-start'.format(product_id), 
             str(time.time())) 
-        # Once-off sensors to query on ?capture_done
-        # Uncomment below to add sensors for query.
-        # sensors_to_query = [] 
-        # self.fetch_once(sensors_to_query, product_id, 3, 5, 0.5)
+
+        # All sensors for subscription:
         sensors_for_update = self.build_sub_sensors(product_id)
-        # Test the speed of retrieval for target information from an 
-        # individual antenna:
+
+        # Add additional target sensor derived from antenna:
         # Retrieve list of antennas:
         ant_key = '{}:antennas'.format(product_id) 
         antennas = self.redis_server.lrange(ant_key, 0, 
@@ -449,6 +434,7 @@ class BLKATPortalClient(object):
         # (implement antenna consensus again if this approach proves faster)
         ant_target = "{}_target".format(antennas[0])        
         sensors_for_update.append(ant_target)
+
         # Start io_loop to listen to sensors whose values should be registered
         # immediately when they change.
         if(len(sensors_for_update) > 0):

@@ -104,6 +104,7 @@ stream_on_configure:
 
 array_sub:
 - observation_activity
+- script_proposal_id
 - script_status 
 - script_last_delay_calibration
 - script_last_phaseup 
