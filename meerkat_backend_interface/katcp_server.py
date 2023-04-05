@@ -246,13 +246,36 @@ ___,-| |----''    / |         `._`-.          `----
             "current:obs:id", product_id))
         statuses.append(write_pair_redis(self.redis_server, 
             "{}:cbf_prefix".format(product_id), cbf_prefix))
-        msg = "configure:{}".format(product_id)
-        statuses.append(publish_to_redis(self.redis_server, 
-            REDIS_CHANNELS.alerts, msg))
+
+        # Check if more than 32 antennas in current subarray before proceeding.
+        # This means (for now, until dual subarray observing is supported) that we
+        # will only process one subarray at a time.
+        if len(antennas_list) > 32:
+            log.info("More than 32 antennas in {}. Configuring.".format(product_id))
+            msg = "configure:{}".format(product_id)
+            statuses.append(publish_to_redis(self.redis_server,
+                REDIS_CHANNELS.alerts, msg))
+        else:
+            log.info("Fewer than 32 antennas in {}. Not configuring.".format(product_id))
+
         if all(statuses):
             return ("ok",)
         else:
             return ("fail", "Failed to publish to our local redis server")
+
+    def _check_antennas(self, product_id):
+        """Returns True if there are more than 32 antennas in the current
+        subarray.
+        """
+        try:
+            key = '{}:antennas'.format(product_id)
+            n_ants = len(self.redis_server.lrange(key, 0, self.redis_server.llen(key)))
+            log.info('{} antennas in {}'.format(n_ants, product_id))
+            if n_ants > 32:
+                return True
+        except Exception as e:
+            log.error(e)
+        return False
 
     @request(Str())
     @return_reply()
@@ -264,11 +287,15 @@ ___,-| |----''    / |         `._`-.          `----
            ?configure request.
         """
         msg = "capture-init:{}".format(product_id)
-        success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
-        if success:
-            return ("ok",)
+        if self._check_antennas(product_id):
+            success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
+            if success:
+                return ("ok",)
+            else:
+                return ("fail", "Failed to publish to our local redis server")
         else:
-            return ("fail", "Failed to publish to our local redis server")
+            log.info("{}: Ignoring this subarray.".format(msg))
+            return("ok")
 
     @request(Str())
     @return_reply()
@@ -280,11 +307,14 @@ ___,-| |----''    / |         `._`-.          `----
             ?configure request.
         """
         msg = "capture-start:{}".format(product_id)
-        success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
-        if success:
-            return ("ok",)
+        if self._check_antennas(product_id):
+            success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
+            if success:
+                return ("ok",)
+            else:
+                return ("fail", "Failed to publish to our local redis server")
         else:
-            return ("fail", "Failed to publish to our local redis server")
+            log.info("{}: Ignoring this subarray.".format(msg))
 
     @request(Str())
     @return_reply()
@@ -296,11 +326,14 @@ ___,-| |----''    / |         `._`-.          `----
             ?configure request.
         """
         msg = "capture-stop:{}".format(product_id)
-        success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
-        if success:
-            return ("ok",)
+        if self._check_antennas(product_id):
+            success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
+            if success:
+                return ("ok",)
+            else:
+                return ("fail", "Failed to publish to our local redis server")
         else:
-            return ("fail", "Failed to publish to our local redis server")
+            log.info("{}: Ignoring this subarray.".format(msg))
 
     @request(Str())
     @return_reply()
@@ -312,11 +345,14 @@ ___,-| |----''    / |         `._`-.          `----
             ?configure request.
         """
         msg = "capture-done:{}".format(product_id)
-        success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
-        if success:
-            return ("ok",)
+        if self._check_antennas(product_id):
+            success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
+            if success:
+                return ("ok",)
+            else:
+                return ("fail", "Failed to publish to our local redis server")
         else:
-            return ("fail", "Failed to publish to our local redis server")
+            log.info("{}: Ignoring this subarray.".format(msg))
 
     @request(Str())
     @return_reply()
@@ -339,11 +375,14 @@ ___,-| |----''    / |         `._`-.          `----
            that their data streams are ending.
         """
         msg = "deconfigure:{}".format(product_id)
-        success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
-        if success:
-            return ("ok",)
+        if self._check_antennas(product_id):
+            success = publish_to_redis(self.redis_server, REDIS_CHANNELS.alerts, msg)
+            if success:
+                return ("ok",)
+            else:
+                return ("fail", "Failed to publish to our local redis server")
         else:
-            return ("fail", "Failed to publish to our local redis server")
+            log.info("{}: Ignoring this subarray.".format(msg))
 
     def setup_sensors(self):
         # TODO: Need to re-look at this function.
