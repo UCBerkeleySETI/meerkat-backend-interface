@@ -295,7 +295,7 @@ ___,-| |----''    / |         `._`-.          `----
             else:
                 return ("fail", "Failed to publish to our local redis server")
         else:
-            log.info(f"{msg}: Ignoring this subarray.")
+            log.info("{}: Ignoring this subarray.".format(msg))
             return("ok",)
 
     @request(Str())
@@ -315,7 +315,7 @@ ___,-| |----''    / |         `._`-.          `----
             else:
                 return ("fail", "Failed to publish to our local redis server")
         else:
-            log.info(f"{msg}: Ignoring this subarray.")
+            log.info("{}: Ignoring this subarray.".format(msg))
             return("ok",)
 
 
@@ -336,7 +336,7 @@ ___,-| |----''    / |         `._`-.          `----
             else:
                 return ("fail", "Failed to publish to our local redis server")
         else:
-            log.info(f"{msg}: Ignoring this subarray.")
+            log.info("{}: Ignoring this subarray.".format(msg))
             return("ok",)
 
     @request(Str())
@@ -356,7 +356,7 @@ ___,-| |----''    / |         `._`-.          `----
             else:
                 return ("fail", "Failed to publish to our local redis server")
         else:
-            log.info(f"{msg}: Ignoring this subarray.")
+            log.info("{}: Ignoring this subarray.".format(msg))
             return("ok",)
 
     @request(Str())
@@ -387,7 +387,7 @@ ___,-| |----''    / |         `._`-.          `----
             else:
                 return ("fail", "Failed to publish to our local redis server")
         else:
-            log.info(f"{msg}: Ignoring this subarray.")
+            log.info("{}: Ignoring this subarray.".format(msg))
             return("ok",)
 
     def setup_sensors(self):
