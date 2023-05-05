@@ -92,6 +92,7 @@ class BLBackendInterface(AsyncDeviceServer):
         set up.
         """
         super(BLBackendInterface, self).start()
+        log.info("Ignoring subarrays with 32 antennas or fewer")
         if(sys.stdout.isatty()):
             print(R"""
                       ,'''''-._
@@ -294,8 +295,8 @@ ___,-| |----''    / |         `._`-.          `----
             else:
                 return ("fail", "Failed to publish to our local redis server")
         else:
-            log.info("{}: Ignoring this subarray.".format(msg))
-            return("ok")
+            log.info(f"{msg}: Ignoring this subarray.")
+            return("ok",)
 
     @request(Str())
     @return_reply()
@@ -314,7 +315,9 @@ ___,-| |----''    / |         `._`-.          `----
             else:
                 return ("fail", "Failed to publish to our local redis server")
         else:
-            log.info("{}: Ignoring this subarray.".format(msg))
+            log.info(f"{msg}: Ignoring this subarray.")
+            return("ok",)
+
 
     @request(Str())
     @return_reply()
@@ -333,7 +336,8 @@ ___,-| |----''    / |         `._`-.          `----
             else:
                 return ("fail", "Failed to publish to our local redis server")
         else:
-            log.info("{}: Ignoring this subarray.".format(msg))
+            log.info(f"{msg}: Ignoring this subarray.")
+            return("ok",)
 
     @request(Str())
     @return_reply()
@@ -352,7 +356,8 @@ ___,-| |----''    / |         `._`-.          `----
             else:
                 return ("fail", "Failed to publish to our local redis server")
         else:
-            log.info("{}: Ignoring this subarray.".format(msg))
+            log.info(f"{msg}: Ignoring this subarray.")
+            return("ok",)
 
     @request(Str())
     @return_reply()
@@ -382,7 +387,8 @@ ___,-| |----''    / |         `._`-.          `----
             else:
                 return ("fail", "Failed to publish to our local redis server")
         else:
-            log.info("{}: Ignoring this subarray.".format(msg))
+            log.info(f"{msg}: Ignoring this subarray.")
+            return("ok",)
 
     def setup_sensors(self):
         # TODO: Need to re-look at this function.
