@@ -179,6 +179,8 @@ class BLKATPortalClient(object):
                         publish_to_redis(self.redis_server, 
                         REDIS_CHANNELS.alerts, 
                         '{}:{}'.format('not-tracking', product_id))
+                        write_pair_redis(self.redis_server, '{}:last-track-end'.format(product_id),
+                        sensor_timestamp)
                 # If script not running, attempt to unsubscribe from sensors
                 elif('script_status' in sensor_name):
                     if(sensor_value != 'busy'):
