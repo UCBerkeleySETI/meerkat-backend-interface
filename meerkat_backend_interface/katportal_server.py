@@ -114,6 +114,7 @@ class BLKATPortalClient(object):
         """
         for key, value in msg.items():
             if key == 'msg_data':
+                array_channel = "bluse:{}///set".format(product_id)
                 sensor_name = msg['msg_data']['name']
                 sensor_value = msg['msg_data']['value']
                 sensor_timestamp = msg['msg_data']['timestamp']
@@ -133,6 +134,8 @@ class BLKATPortalClient(object):
                         REDIS_CHANNELS.sensor_alerts, 
                         '{}:{}:{}'.format('data-suspect', product_id, 
                             sensor_value))
+                        bitmask = '#{:x}'.format(int(sensor_value, 2))
+                        self.redis_server.publish(array_channel, "FESTATUS={}".format(bitmask))
                 #RA/Dec/Az/El
                 elif('pos_request_base' in sensor_name):
                     publish_to_redis(self.redis_server, 
@@ -142,6 +145,16 @@ class BLKATPortalClient(object):
                     # Aternate method:
                     # self.antenna_consensus(product_id, 
                     #     'pos_request_base_dec')
+                elif("pos_request_base_azim" in sensor_name):
+                    self.redis_server.publish(array_channel, "AZ={}".format(sensor_value))
+                elif("pos_request_base_elev" in sensor_name):
+                    self.redis_server.publish(array_channel, "EL={}".format(sensor_value))
+                elif("pos_request_base_ra" in sensor_name):
+                    self.redis_server.publish(array_channel, "RA_STR={}".format(sensor_value))
+                elif("pos_request_base_dec" in sensor_name):
+                    self.redis_server.publish(array_channel, "DEC_STR={}".format(sensor_value))
+                elif("offset_ut1" in sensor_name):
+                    self.redis_server.publish(array_channel, "UT1_UTC={}".format(sensor_value))
                 # Check for noise diode operation:
                 elif('diode' in sensor_name):
                     publish_to_redis(self.redis_server, 
