@@ -33,6 +33,7 @@ from __future__ import print_function
 import sys
 import json
 import time
+import socket
 from katcp import Sensor, AsyncDeviceServer, AsyncReply
 from katcp.kattypes import request, return_reply, Int, Str
 
@@ -91,7 +92,17 @@ class BLBackendInterface(AsyncDeviceServer):
         where the clients for subordinate nodes will be
         set up.
         """
-        super(BLBackendInterface, self).start()
+        for attempt in range(5):
+            try:
+                super(BLBackendInterface, self).start()
+                break
+            except socket.gaierror:
+                if attempt < 4:
+                    log.error("Service not available yet, retrying in 10s")
+                    time.sleep(10)
+                else:
+                    log.error("Could not start after 5 attempts")
+
         log.info("Ignoring subarrays with 32 antennas or fewer")
         if(sys.stdout.isatty()):
             print(R"""
