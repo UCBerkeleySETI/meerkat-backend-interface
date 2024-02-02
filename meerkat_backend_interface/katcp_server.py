@@ -256,8 +256,13 @@ ___,-| |----''    / |         `._`-.          `----
             msg = "configure:{}".format(product_id)
             statuses.append(publish_to_redis(self.redis_server,
                 REDIS_CHANNELS.alerts, msg))
+        elif product_id == "array_1":
+            log.info("Array 1: {}. Therefore, configuring.".format(product_id))
+            msg = "configure:{}".format(product_id)
+            statuses.append(publish_to_redis(self.redis_server,
+                REDIS_CHANNELS.alerts, msg))
         else:
-            log.info("Fewer than 32 antennas in {}. Not configuring.".format(product_id))
+            log.info("Fewer than 32 antennas and not `array_1`. Not configuring.")
 
         if all(statuses):
             return ("ok",)
@@ -273,6 +278,8 @@ ___,-| |----''    / |         `._`-.          `----
             n_ants = len(self.redis_server.lrange(key, 0, self.redis_server.llen(key)))
             log.info('{} antennas in {}'.format(n_ants, product_id))
             if n_ants > 32:
+                return True
+            elif product_id == "array_1":
                 return True
         except Exception as e:
             log.error(e)
